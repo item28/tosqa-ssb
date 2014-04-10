@@ -36,7 +36,7 @@ int main () {
     palClearPad(GPIO1, GPIO1_MOTOR_DIR);
     palClearPad(GPIO0, GPIO0_MOTOR_STEP);
 
-    // take 1000 steps @ 250 Hz in one direction, then in the other, forever
+    // take 500 steps @ 250 Hz in one direction, then in the other, forever
     for (;;) {
         for (int i = 0; i < 1000; ++i) {
             palTogglePad(GPIO0, GPIO0_MOTOR_STEP);
