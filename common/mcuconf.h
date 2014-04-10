@@ -51,7 +51,7 @@
 /*
  * SERIAL driver system settings.
  */
-#define LPC11xx_SERIAL_USE_UART0            TRUE
+#define LPC11xx_SERIAL_USE_UART0            FALSE
 #define LPC11xx_SERIAL_FIFO_PRELOAD         16
 #define LPC11xx_SERIAL_UART0CLKDIV          1
 #define LPC11xx_SERIAL_UART0_IRQ_PRIORITY   3
@@ -59,7 +59,7 @@
 /*
  * SPI driver system settings.
  */
-#define LPC11xx_SPI_USE_SSP0                TRUE
+#define LPC11xx_SPI_USE_SSP0                FALSE
 #define LPC11xx_SPI_USE_SSP1                FALSE
 #define LPC11xx_SPI_SSP0CLKDIV              1
 #define LPC11xx_SPI_SSP1CLKDIV              1
@@ -89,13 +89,13 @@
  * PWM driver system settings.
  */
 #define LPC11xx_PWM_USE_CT16B0              FALSE
-#define LPC11xx_PWM_USE_CT16B1              TRUE
+#define LPC11xx_PWM_USE_CT16B1              FALSE
 #define LPC11xx_PWM_USE_CT32B0              FALSE
 #define LPC11xx_PWM_USE_CT32B1              FALSE
 #define LPC11xx_PWM_USE_CT16B0_CH0          FALSE
 #define LPC11xx_PWM_USE_CT16B0_CH1          FALSE
-#define LPC11xx_PWM_USE_CT16B1_CH0          TRUE
-#define LPC11xx_PWM_USE_CT16B1_CH1          TRUE
+#define LPC11xx_PWM_USE_CT16B1_CH0          FALSE
+#define LPC11xx_PWM_USE_CT16B1_CH1          FALSE
 #define LPC11xx_PWM_USE_CT32B0_CH0          FALSE
 #define LPC11xx_PWM_USE_CT32B0_CH1          FALSE
 #define LPC11xx_PWM_USE_CT32B1_CH0          FALSE
