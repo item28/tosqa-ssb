@@ -13,22 +13,30 @@
 
 CCAN_MSG_OBJ_T msg_obj;
 
-void CAN_rxCallback (uint8_t msg_obj_num) {
+static void copyToPins (uint8_t bits) {
+  palWritePad(GPIO3, GPIO3_MOTOR_SLEEP, ~(bits >> 7) & 1); // active low
+  palWritePad(GPIO1, GPIO1_MOTOR_MS3,    (bits >> 6) & 1);
+  palWritePad(GPIO1, GPIO1_MOTOR_MS2,    (bits >> 5) & 1);
+  palWritePad(GPIO3, GPIO3_MOTOR_MS1,    (bits >> 4) & 1);
+  palWritePad(GPIO1, GPIO1_MOTOR_RESET, ~(bits >> 3) & 1); // active low
+  palWritePad(GPIO3, GPIO3_MOTOR_EN,    ~(bits >> 2) & 1); // active low
+  palWritePad(GPIO1, GPIO1_MOTOR_DIR,    (bits >> 1) & 1);
+  palWritePad(GPIO0, GPIO0_MOTOR_STEP,   (bits >> 0) & 1);
+}
+
+static void CAN_rxCallback (uint8_t msg_obj_num) {
   msg_obj.msgobj = msg_obj_num;
   LPC_CCAN_API->can_receive(&msg_obj);
-  // quick sanity check, ignore packets with more than 1 byte of data
-  if (msg_obj.dlc == 1) {
-    /* payload.byte = msg_obj.data[0]; */
-    /* copyToPins(msg_obj.mode_id); */
-  }
+  // quick sanity check, ignore packets with anything but 1 byte of data
+  if (msg_obj.dlc == 1)
+    copyToPins(msg_obj.data[0]);
 }
 
-void CAN_txCallback (uint8_t msg_obj_num) {
-}
+static void CAN_txCallback (uint8_t /* msg_obj_num */) {}
 
-void CAN_errorCallback (uint32_t error_info) {
+static void CAN_errorCallback (uint32_t error_info) {
   if (error_info & 0x0002)
-    palClearPad(GPIO3, 1); // turn on LED2 on Open11C14 board
+    palTogglePad(GPIO0, GPIO0_LED2);
 }
 
 static CCAN_CALLBACKS_T callbacks = {
@@ -66,10 +74,7 @@ static WORKING_AREA(waBlinkTh, 64);
 static msg_t BlinkTh (void*) {
   for (;;) {
     chThdSleepMilliseconds(250);
-    // palTogglePad(GPIO1, GPIO1_LED1);
-    palTogglePad(GPIO3, GPIO3_MOTOR_SLEEP);
-    palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
-    palTogglePad(GPIO3, GPIO3_MOTOR_EN);
+    palTogglePad(GPIO1, GPIO1_LED1);
   }
   return 0;
 }
@@ -99,13 +104,11 @@ int main () {
 
   chThdSleepMilliseconds(50);
 
-  msg_obj.msgobj  = 0;
-  msg_obj.mode_id = 0x456;
-  msg_obj.mask    = 0x0;
-  msg_obj.dlc     = 2;
-  msg_obj.data[0] = 0xAA;
-  msg_obj.data[0] = 0x55;
-  LPC_CCAN_API->can_transmit(&msg_obj);
+  /* Configure message object 1 to receive all 11-bit messages 0x410-0x413 */
+  msg_obj.msgobj = 1;
+  msg_obj.mode_id = 0x410;
+  msg_obj.mask = 0x7FC;
+  LPC_CCAN_API->config_rxmsgobj(&msg_obj);
 
   for (;;) {
     chThdSleepMilliseconds(500);
