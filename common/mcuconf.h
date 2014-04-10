@@ -1,5 +1,7 @@
 /*
     ChibiOS/RT - Copyright (C) 2006-2013 Giovanni Di Sirio
+    LPC11xx EXT driver - Copyright (C) 2013 Marcin Jokel
+                       - Copyright (C) 2013 mike brown
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -15,7 +17,7 @@
 */
 
 /*
- * LPC812 drivers configuration.
+ * LPC1114 drivers configuration.
  * The following settings override the default settings present in
  * the various device driver implementation headers.
  * Note that the settings for each driver only have effect if the driver
@@ -28,51 +30,77 @@
 /*
  * HAL driver system settings.
  */
-
-/* Default: Run PLL @24MHz from 12MHz IRC
-  #define LPC8xx_PLLCLK_SOURCE               SYSPLLCLKSEL_IRCOSC
-  #define LPC8xx_SYSPLL_MUL                  4
-  #define LPC8xx_SYSPLL_DIV                  4
-  #define LPC8xx_MAINCLK_SOURCE              SYSMAINCLKSEL_PLLOUT
-  #define LPC8xx_SYSABHCLK_DIV               1
-*/
-
-/*run directly from internal 12M osc...*/
-#define LPC8xx_MAINCLK_SOURCE              SYSMAINCLKSEL_IRCOSC
+#define LPC11xx_PLLCLK_SOURCE               SYSPLLCLKSEL_SYSOSC
+#define LPC11xx_SYSPLL_MUL                  4
+#define LPC11xx_SYSPLL_DIV                  4
+#define LPC11xx_MAINCLK_SOURCE              SYSMAINCLKSEL_PLLOUT
+#define LPC11xx_SYSABHCLK_DIV               1
 
 /*
  * GPT driver system settings.
  */
-/* Defaults:
-  #define LPC8xx_GPT_USE_MRT0              TRUE
-  #define LPC8xx_GPT_USE_MRT1              FALSE
-  #define LPC8xx_GPT_USE_MRT2              FALSE
-  #define LPC8xx_GPT_USE_MRT3              FALSE
-  #define LPC8xx_GPT_MRT_IRQ_PRIORITY      2
-*/
-
-/*
- * PWM driver system settings.
- */
+#define LPC11xx_GPT_USE_CT16B0              FALSE
+#define LPC11xx_GPT_USE_CT16B1              FALSE
+#define LPC11xx_GPT_USE_CT32B0              FALSE
+#define LPC11xx_GPT_USE_CT32B1              FALSE
+#define LPC11xx_GPT_CT16B0_IRQ_PRIORITY     1
+#define LPC11xx_GPT_CT16B1_IRQ_PRIORITY     3
+#define LPC11xx_GPT_CT32B0_IRQ_PRIORITY     2
+#define LPC11xx_GPT_CT32B1_IRQ_PRIORITY     2
 
 /*
  * SERIAL driver system settings.
  */
-/* Defaults:
-  #define LPC8xx_SERIAL_USE_UART0            TRUE
-  #define LPC8xx_SERIAL_USE_UART1            FALSE
-  #define LPC8xx_SERIAL_USE_UART2            FALSE
-  #define LPC8xx_SERIAL_UART0_IRQ_PRIORITY   3
-  #define LPC8xx_SERIAL_UART1_IRQ_PRIORITY   3
-  #define LPC8xx_SERIAL_UART2_IRQ_PRIORITY   3
+#define LPC11xx_SERIAL_USE_UART0            TRUE
+#define LPC11xx_SERIAL_FIFO_PRELOAD         16
+#define LPC11xx_SERIAL_UART0CLKDIV          1
+#define LPC11xx_SERIAL_UART0_IRQ_PRIORITY   3
 
-  #define LPC8xx_SERIAL_U_PCLK              11059200
-  #define LPC8xx_SERIAL_UARTCLKDIV          !!Calculated!!
-  #define LPC8xx_SERIAL_UARTFRGMUL          !!Calculated!!
-  #define LPC8xx_SERIAL_UARTFRGDIV          !!Calculated!!
-*/
+/*
+ * SPI driver system settings.
+ */
+#define LPC11xx_SPI_USE_SSP0                TRUE
+#define LPC11xx_SPI_USE_SSP1                FALSE
+#define LPC11xx_SPI_SSP0CLKDIV              1
+#define LPC11xx_SPI_SSP1CLKDIV              1
+#define LPC11xx_SPI_SSP0_IRQ_PRIORITY       1
+#define LPC11xx_SPI_SSP1_IRQ_PRIORITY       1
+#define LPC11xx_SPI_SSP_ERROR_HOOK(spip)    chSysHalt()
+#define LPC11xx_SPI_SCK0_SELECTOR           SCK0_IS_PIO2_11
 
-/* change default baudrate to 9600 */
-#define SERIAL_DEFAULT_BITRATE              9600
+/*
+ * EXT driver system settings.
+ */
+#define LPC11xx_EXT_USE_EXT0                FALSE
+#define LPC11xx_EXT_USE_EXT1                FALSE
+#define LPC11xx_EXT_USE_EXT2                FALSE
+#define LPC11xx_EXT_USE_EXT3                FALSE
+#define LPC11xx_EXT_EXTI0_IRQ_PRIORITY      3
+#define LPC11xx_EXT_EXTI1_IRQ_PRIORITY      3
+#define LPC11xx_EXT_EXTI2_IRQ_PRIORITY      3
+#define LPC11xx_EXT_EXTI3_IRQ_PRIORITY      3
 
+/*
+ * I2C driver system settings.
+ */
+#define LPC11xx_I2C_IRQ_PRIORITY            3
 
+/*
+ * PWM driver system settings.
+ */
+#define LPC11xx_PWM_USE_CT16B0              FALSE
+#define LPC11xx_PWM_USE_CT16B1              TRUE
+#define LPC11xx_PWM_USE_CT32B0              FALSE
+#define LPC11xx_PWM_USE_CT32B1              FALSE
+#define LPC11xx_PWM_USE_CT16B0_CH0          FALSE
+#define LPC11xx_PWM_USE_CT16B0_CH1          FALSE
+#define LPC11xx_PWM_USE_CT16B1_CH0          TRUE
+#define LPC11xx_PWM_USE_CT16B1_CH1          TRUE
+#define LPC11xx_PWM_USE_CT32B0_CH0          FALSE
+#define LPC11xx_PWM_USE_CT32B0_CH1          FALSE
+#define LPC11xx_PWM_USE_CT32B1_CH0          FALSE
+#define LPC11xx_PWM_USE_CT32B1_CH1          FALSE
+#define LPC11xx_PWM_CT16B0_IRQ_PRIORITY     3
+#define LPC11xx_PWM_CT16B1_IRQ_PRIORITY     3
+#define LPC11xx_PWM_CT32B0_IRQ_PRIORITY     3
+#define LPC11xx_PWM_CT32B1_IRQ_PRIORITY     3

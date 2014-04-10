@@ -1,27 +1,26 @@
+// ssb11_blinker - alternately blink LED1 and LED2
+// jcw, 2014-04-10
+
 #include "ch.h"
 #include "hal.h"
 
-static WORKING_AREA(waThread1, 64);
-
-static msg_t Thread1 (void*) {
-  while (true) {
-    /* LPC_GPIO_PORT->NOT0 = 1 << LED_RED; */
-    chThdSleepMilliseconds(500);
-  }
-  return 0;
-}
-
 int main () {
-  halInit();
-  chSysInit();
+    halInit();
+    chSysInit();
 
-  /* LPC_GPIO_PORT->DIR0 |= (1 << LED_RED) | (1 << LED_GREEN) | (1 << LED_BLUE); */
+    // this works on an LPC11C24 LPCXpresso board (LED on PIO0_7, ENDSTOP0)
+    // and on a WaveShare Open11C14 dev board (2 LEDs, same pins as on SSB)
 
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
+    palClearPad(GPIO0, GPIO0_LED);
+    palClearPad(GPIO3, GPIO3_LED1);
+    palSetPad(GPIO3, GPIO3_LED2);
 
-  do {
-    chThdSleepMilliseconds(500);
-  } while (true);
-  
-  return 0;
+    do {
+        chThdSleepMilliseconds(500);
+        palTogglePad(GPIO0, GPIO0_LED);
+        palTogglePad(GPIO3, GPIO3_LED1);
+        palTogglePad(GPIO3, GPIO3_LED2);
+    } while (true);
+
+    return 0;
 }

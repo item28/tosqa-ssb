@@ -59,14 +59,17 @@
 /*
  * GPIO 3 initial setup.
  */
-#define VAL_GPIO3DIR            0x00000000
-#define VAL_GPIO3DATA           0x00000000
+#define VAL_GPIO3DIR            PAL_PORT_BIT(GPIO3_LED1)   |                \
+                                PAL_PORT_BIT(GPIO3_LED2)
+#define VAL_GPIO3DATA           PAL_PORT_BIT(GPIO3_LED1)   |                \
+                                PAL_PORT_BIT(GPIO3_LED2)
 
 /*
  * Pin definitions.
  */
-#define GPIO0_SW_ISP            1
 #define GPIO0_LED               7
+#define GPIO3_LED1              0
+#define GPIO3_LED2              1
 
 #if !defined(_FROM_ASM_)
 #ifdef __cplusplus
