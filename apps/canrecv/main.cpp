@@ -6,18 +6,12 @@
 
 #define IAP_ENTRY_LOCATION        0X1FFF1FF1
 #define LPC_ROM_API_BASE_LOC      0x1FFF1FF8
-
-#define LPC_ROM_API               (*((LPC_ROM_API_T        * *) LPC_ROM_API_BASE_LOC))
+#define LPC_ROM_API               (*(LPC_ROM_API_T**) LPC_ROM_API_BASE_LOC)
 
 #include "../../common/nxp/romapi_11xx.h"
 #include "../../common/nxp/ccand_11xx.h"
 
 CCAN_MSG_OBJ_T msg_obj;
-
-static uint32_t clkInitTable[2] = {
-  0x00000000UL, // CANCLKDIV, running at 48 MHz
-  0x000076C5UL  // CAN_BTR, produces 500 Kbps
-};
 
 void CAN_rxCallback (uint8_t msg_obj_num) {
   msg_obj.msgobj = msg_obj_num;
@@ -56,6 +50,11 @@ void Vector74 () {
 
 static void initCan () {
   LPC_SYSCON->SYSAHBCLKCTRL |= 1 << 17; // SYSCTL_CLOCK_CAN
+
+  static uint32_t clkInitTable[2] = {
+    0x00000000UL, // CANCLKDIV, running at 48 MHz
+    0x000076C5UL  // CAN_BTR, produces 500 Kbps
+  };
 
   LPC_CCAN_API->init_can(clkInitTable, true);
   LPC_CCAN_API->config_calb(&callbacks);
