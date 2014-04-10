@@ -8,19 +8,15 @@ int main () {
     halInit();
     chSysInit();
 
-    // this works on an LPC11C24 LPCXpresso board (LED on PIO0_7, ENDSTOP0)
-    // and on a WaveShare Open11C14 dev board (2 LEDs, same pins as on SSB)
+    palClearPad(GPIO1, GPIO1_LED1);
+    palSetPad(GPIO0, GPIO0_LED2);
 
-    palClearPad(GPIO0, GPIO0_LED);
-    palClearPad(GPIO3, GPIO3_LED1);
-    palSetPad(GPIO3, GPIO3_LED2);
-
-    do {
+    for (;;) {
         chThdSleepMilliseconds(500);
-        palTogglePad(GPIO0, GPIO0_LED);
-        palTogglePad(GPIO3, GPIO3_LED1);
-        palTogglePad(GPIO3, GPIO3_LED2);
-    } while (true);
+
+        palTogglePad(GPIO1, GPIO1_LED1);
+        palTogglePad(GPIO0, GPIO0_LED2);
+    }
 
     return 0;
 }
