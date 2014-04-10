@@ -159,6 +159,46 @@
 #define GPIO3_DIGIPOT_CS        1
 #define GPIO1_DIGIPOT_UD        11
 
+// shorthand, avoids having to look up GPIO values all the time in PAL calls
+// TODO: doesn't work with palSetPad, etc macro's
+
+// #define MOTOR_SLEEP     GPIO3, GPIO3_MOTOR_SLEEP
+// #define MOTOR_MS3       GPIO1, GPIO1_MOTOR_MS3
+// #define MOTOR_MS2       GPIO1, GPIO1_MOTOR_MS2
+// #define MOTOR_MS1       GPIO3, GPIO3_MOTOR_MS1
+// #define MOTOR_RESET     GPIO1, GPIO1_MOTOR_RESET
+// #define MOTOR_EN        GPIO3, GPIO3_MOTOR_EN
+// #define MOTOR_DIR       GPIO1, GPIO1_MOTOR_DIR
+// #define MOTOR_STEP      GPIO0, GPIO0_MOTOR_STEP
+//
+// #define HALL_DEC        GPIO0, GPIO0_HALL_DEC
+// #define HALL_INC        GPIO0, GPIO0_HALL_INC
+// #define HALL_SPI_CS     GPIO2, GPIO2_HALL_SPI_CS
+// #define HALL_SPI_SCK    GPIO2, GPIO2_HALL_SPI_SCK
+// #define HALL_SPI_MISO   GPIO2, GPIO2_HALL_SPI_MISO
+// #define HALL_SPI_MOSI   GPIO2, GPIO2_HALL_SPI_MOSI
+// #define HALL_MODE       GPIO2, GPIO2_HALL_MODE
+//
+// #define LED1            GPIO1, GPIO1_LED1
+// #define LED2            GPIO0, GPIO0_LED2
+//
+// #define BOOT            GPIO0, GPIO0_BOOT
+// #define BOOT_SEL        GPIO0, GPIO0_BOOT_SEL
+// #define BOOT_AUTORESET  GPIO2, GPIO2_BOOT_AUTORESET
+//
+// #define ENDSTOP0        GPIO2, GPIO2_ENDSTOP0
+// #define ENDSTOP1        GPIO0, GPIO0_ENDSTOP1
+// #define ENDSTOP_I2C     GPIO2, GPIO2_ENDSTOP_I2C
+// #define ENDSTOP_SCL     GPIO0, GPIO0_ENDSTOP_SCL
+// #define ENDSTOP_SDA     GPIO0, GPIO0_ENDSTOP_SDA
+//
+// #define TEMP_NTC        GPIO1, GPIO1_TEMP_NTC
+// #define LEVEL_5V        GPIO1, GPIO1_LEVEL_5V
+// #define LEVEL_VMOT      GPIO1, GPIO1_LEVEL_VMOT
+//
+// #define DIGIPOT_CS      GPIO3, GPIO3_DIGIPOT_CS
+// #define DIGIPOT_UD      GPIO1, GPIO1_DIGIPOT_UD
+
 // common LED position on dev boards, harmless re-use, used for testing
 #define GPIO0_LED               GPIO0_HALL_INC
 

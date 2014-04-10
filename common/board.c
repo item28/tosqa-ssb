@@ -50,5 +50,8 @@ void boardInit(void) {
   /*
    * Extra, board-specific, initializations.
    */
-  LPC_IOCON->PIO0_7 = 0xC0;             /* Disables pull-up on LED2 output. */
+  LPC_IOCON->R_PIO0_11 = 0xD1;  // MOTOR_STEP, gpio
+  LPC_IOCON->R_PIO1_0 = 0x42;   // LEVEL_5V, analog in
+  LPC_IOCON->R_PIO1_1 = 0x42;   // LEVEL_VMOT, analog in
+  LPC_IOCON->R_PIO1_2 = 0x42;   // TEMP_NTC, analog in
 }

@@ -1,4 +1,4 @@
-// ssb11_blinker - alternately blink LED1 and LED2
+// ssb11 blinker - alternately blink LED1 and LED2
 // jcw, 2014-04-10
 
 #include "ch.h"
