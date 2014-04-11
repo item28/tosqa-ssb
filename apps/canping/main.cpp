@@ -1,4 +1,4 @@
-// ssb11 can ping - send a periodic massage out to the CAN bus
+// ssb11 can send - send periodic ADC readings out to the CAN bus
 // jcw, 2014-04-10
 
 #include "ch.h"
@@ -52,15 +52,12 @@ static void initCan () {
   NVIC_EnableIRQ(CAN_IRQn);
 }
 
-// keep a LED blinking at 2 Hz in the background
-static WORKING_AREA(waBlinkTh, 64);
-static msg_t BlinkTh (void*) {
-  for (;;) {
-    chThdSleepMilliseconds(250);
-    // palTogglePad(GPIO1, GPIO1_LED1);
-    palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
-  }
-  return 0;
+static uint16_t readAdc(uint8_t num) {
+  LPC_ADC->CR = 0x0B00 | (1 << num);// select AD1..3, set up clock (sec. 25.5.1)
+  LPC_ADC->CR |= 1 << 24; // set "Start Conversion Now" bit (sec. 25.5.1)
+  while (LPC_ADC->DR[num] < 0x7FFFFFFF)
+    ; // wait for "done" bit to be set (sec. 25.5.4)
+  return (LPC_ADC->DR[num] >> 6) & 0x3FF;
 }
 
 int main () {
@@ -73,20 +70,28 @@ int main () {
   chThdSleepMilliseconds(100);
   palTogglePad(GPIO0, GPIO0_LED2);
 
-  // launch the blinker background thread
-  chThdCreateStatic(waBlinkTh, sizeof(waBlinkTh), NORMALPRIO, BlinkTh, NULL);
-
   for (;;) {
     chThdSleepMilliseconds(500);
 
+    uint16_t adc1 = readAdc(1);
+    uint16_t adc2 = readAdc(2);
+    uint16_t adc3 = readAdc(3);
+    
     msg_obj.msgobj  = 0;
     msg_obj.mode_id = 0x456;
     msg_obj.mask    = 0x0;
-    msg_obj.dlc     = 2;
-    msg_obj.data[0] = 0xAA;
-    msg_obj.data[1] = 0x55;
+    msg_obj.dlc     = 6;
+    msg_obj.data[0] = adc1 >> 8;
+    msg_obj.data[1] = adc1;
+    msg_obj.data[2] = adc2 >> 8;
+    msg_obj.data[3] = adc2;
+    msg_obj.data[4] = adc3 >> 8;
+    msg_obj.data[5] = adc3;
 
     LPC_CCAN_API->can_transmit(&msg_obj);
+
+    // palTogglePad(GPIO1, GPIO1_LED1);
+    palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
   }
 
   return 0;

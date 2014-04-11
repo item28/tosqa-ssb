@@ -51,7 +51,18 @@ void boardInit(void) {
    * Extra, board-specific, initializations.
    */
   LPC_IOCON->R_PIO0_11 = 0xD1;  // MOTOR_STEP, gpio
-  LPC_IOCON->R_PIO1_0 = 0x42;   // LEVEL_5V, analog in
-  LPC_IOCON->R_PIO1_1 = 0x42;   // LEVEL_VMOT, analog in
-  LPC_IOCON->R_PIO1_2 = 0x42;   // TEMP_NTC, analog in
+
+  // ADC setup, see http://eewiki.net/display/microcontroller/
+  //  Getting+Started+with+NXP%27s+LPC11XX+Cortex-M0+ARM+Microcontrollers
+  LPC_SYSCON->PDRUNCFG        &= ~(0x1<<4); //power the ADC (sec. 3.5.35)
+  LPC_SYSCON->SYSAHBCLKCTRL   |= (1<<13);   //enable clock for ADC (sec. 3.5.14)
+
+  LPC_IOCON->R_PIO1_0 &= ~(0x97); // set LEVEL_5V to analog in (sec. 7.4.29)
+  LPC_IOCON->R_PIO1_0 |= (1<<1);  // set to ADC mode for pin 33 (sec. 7.4.29)
+
+  LPC_IOCON->R_PIO1_1 &= ~(0x97); // set LEVEL_VMOT to analog in (sec. 7.4.30)
+  LPC_IOCON->R_PIO1_1 |= (1<<1);  // set to ADC mode for pin 34 (sec. 7.4.30)
+
+  LPC_IOCON->R_PIO1_2 &= ~(0x97); // set TEMP_NTC to analog in (sec. 7.4.31)
+  LPC_IOCON->R_PIO1_2 |= (1<<1);  // set to ADC mode for pin 35 (sec. 7.4.31)
 }
