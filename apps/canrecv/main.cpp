@@ -27,14 +27,22 @@ static void copyToPins (uint8_t bits) {
 static void CAN_rxCallback (uint8_t msg_obj_num) {
   msg_obj.msgobj = msg_obj_num;
   LPC_CCAN_API->can_receive(&msg_obj);
-  // quick sanity check, ignore packets with anything but 1 byte of data
-  if (msg_obj.dlc == 1)
+  if (msg_obj.dlc == 0) {
+    palTogglePad(GPIO0, GPIO0_MOTOR_STEP);
+    volatile int i;
+    for (i = 0; i < 100; ++i)
+      ;
+    palTogglePad(GPIO0, GPIO0_MOTOR_STEP);
+  } else if (msg_obj.dlc == 1)
     copyToPins(msg_obj.data[0]);
 }
 
 static void CAN_txCallback (uint8_t /* msg_obj_num */) {}
 
-static void CAN_errorCallback (uint32_t /* error_info */) {}
+static void CAN_errorCallback (uint32_t error_info) {
+  if (error_info & 0x0002)
+    palTogglePad(GPIO0, GPIO0_LED2);
+}
 
 static CCAN_CALLBACKS_T callbacks = {
   CAN_rxCallback,

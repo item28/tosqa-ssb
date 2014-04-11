@@ -13,14 +13,15 @@
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
-CCAN_MSG_OBJ_T msg_obj;
+CCAN_MSG_OBJ_T msg_obj, msg_recv;
+volatile bool received;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
   msg_obj.msgobj = msg_obj_num;
   LPC_CCAN_API->can_receive(&msg_obj);
-  // quick sanity check, ignore packets with anything but 1 byte of data
-  if (msg_obj.dlc == 1) {
-    // copyToPins(msg_obj.data[0]);
+  if (!received) {
+    msg_recv = msg_obj;
+    received = true;
   }
 }
 
@@ -65,8 +66,10 @@ static void initCan () {
 static WORKING_AREA(waBlinkTh, 64);
 static msg_t BlinkTh (void*) {
   for (;;) {
-    chThdSleepMilliseconds(250);
     palTogglePad(GPIO0, GPIO0_LED);
+    chThdSleepMilliseconds(999);
+    palTogglePad(GPIO0, GPIO0_LED);
+    chThdSleepMilliseconds(1); // very dim 1s blink
   }
   return 0;
 }
@@ -89,24 +92,40 @@ int main () {
   // launch the blinker background thread
   chThdCreateStatic(waBlinkTh, sizeof(waBlinkTh), NORMALPRIO, BlinkTh, NULL);
 
-  /* Configure message object 1 to receive all 11-bit messages 0x410-0x413 */
+  /* Configure message object 1 to receive all 11-bit messages 0x400-0x4FF */
   msg_obj.msgobj = 1;
-  msg_obj.mode_id = 0x410;
-  msg_obj.mask = 0x7FC;
+  msg_obj.mode_id = 0x400;
+  msg_obj.mask = 0x700;
   LPC_CCAN_API->config_rxmsgobj(&msg_obj);
 
   chThdSleepMilliseconds(1000);
+  clearDisplay();
   
   static char buf[17];
-  chsnprintf(buf, sizeof buf, "X %08x Y", 1234567);
-  sendStrXY(buf, 0, 0);
-  chThdSleepMilliseconds(1000);
-  
   for (int y = 0; ; ++y) {
-    chThdSleepMilliseconds(500);
-    for (int x = 0; x < 16; ++x)
-      buf[x] = ' ' + x + y % 80;
-    sendStrXY(buf, y % 8, 0);
+    while (!received)
+      chThdYield(); // wait until data available from receiver interrupt
+    int line = (y * 2) % 6;
+
+    palTogglePad(GPIO0, GPIO0_LEDB); // blue LED on, very briefly
+    sendStrXY(" ", (line + 4) % 6, 0); // clear the previous cursor
+    palTogglePad(GPIO0, GPIO0_LEDB); // blue LED off again
+    
+    // display first line
+    chsnprintf(buf, sizeof buf, ">%03x            ", msg_recv.mode_id);
+    sendStrXY(buf, line, 0);
+    
+    // display second line
+    chsnprintf(buf, sizeof buf, "%02X%02X%02x%02x%02X%02X%02x%02x",
+      msg_recv.data[0], msg_recv.data[1], msg_recv.data[2], msg_recv.data[3],
+      msg_recv.data[4], msg_recv.data[5], msg_recv.data[6], msg_recv.data[7]);
+    for (int i = msg_obj.dlc; i < 8; ++i)
+      buf[2*i] = buf[2*i+1] = 0; // clear bytes past the received data
+    sendStrXY(buf, line + 1, 0);
+    
+    // release message buffer for re-use - since the display is slow, this
+    // may lead to lost messages, i.e. received but not shown on the display
+    received = false;
   }
 
   return 0;

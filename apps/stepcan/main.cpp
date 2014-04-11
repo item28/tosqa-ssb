@@ -82,7 +82,8 @@ int main () {
 
     cmd ^= 0b010; // toggle DIR
 
-    palTogglePad(GPIO1, GPIO1_LED1);
+    // palTogglePad(GPIO1, GPIO1_LED1);
+    palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
   }
 
   return 0;
