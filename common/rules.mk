@@ -53,7 +53,7 @@ endif
 PROJECT = firmware
 
 # Imported source files
-CHIBIOS = $(TOSQA_COMMON)/../../../ChibiOS/ChibiOS-RT
+CHIBIOS = ../../../../ChibiOS/ChibiOS-RT
 include $(CHIBIOS)/os/hal/platforms/LPC11xx/platform.mk
 include $(CHIBIOS)/os/hal/hal.mk
 include $(CHIBIOS)/os/ports/GCC/ARMCMx/LPC11xx/port.mk
@@ -149,7 +149,7 @@ CPPWARN = -Wall -Wextra
 #
 
 # List all default C defines here, like -D_DEBUG=1
-DDEFS = -DLPC812 -D__NEWLIB__
+DDEFS = -D__NEWLIB__
 
 # List all default ASM defines here, like -D_DEBUG=1
 DADEFS =

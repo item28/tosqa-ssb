@@ -1,5 +1,5 @@
-// ssb11 can send - send periodic ADC readings out to the CAN bus
-// jcw, 2014-04-10
+// ssb11 step can - send CAN bus commands to drive a board running ../canrecv
+// jcw, 2014-04-11
 
 #include "ch.h"
 #include "hal.h"
@@ -52,14 +52,6 @@ static void initCan () {
   NVIC_EnableIRQ(CAN_IRQn);
 }
 
-static uint16_t readAdc (uint8_t num) {
-  LPC_ADC->CR = 0x0B00 | (1 << num);// select AD1..3, set up clock (sec. 25.5.1)
-  LPC_ADC->CR |= 1 << 24; // set "Start Conversion Now" bit (sec. 25.5.1)
-  while (LPC_ADC->DR[num] < 0x7FFFFFFF)
-    ; // wait for "done" bit to be set (sec. 25.5.4)
-  return (LPC_ADC->DR[num] >> 6) & 0x3FF;
-}
-
 int main () {
   halInit();
   chSysInit();
@@ -70,28 +62,27 @@ int main () {
   chThdSleepMilliseconds(100);
   palTogglePad(GPIO0, GPIO0_LED2);
 
+  // take 500 steps @ 250 Hz in one direction, then in the other, forever
+  uint8_t cmd = 0b00000100; // set ENABLE
+
   for (;;) {
-    chThdSleepMilliseconds(500);
+    for (int i = 0; i < 1000; ++i) {
+      cmd ^= 0b001; // toggle STEP
 
-    uint16_t adc1 = readAdc(1);
-    uint16_t adc2 = readAdc(2);
-    uint16_t adc3 = readAdc(3);
-    
-    msg_obj.msgobj  = 0;
-    msg_obj.mode_id = 0x456;
-    msg_obj.mask    = 0x0;
-    msg_obj.dlc     = 6;
-    msg_obj.data[0] = adc1;
-    msg_obj.data[1] = adc1 >> 8;
-    msg_obj.data[2] = adc2;
-    msg_obj.data[3] = adc2 >> 8;
-    msg_obj.data[4] = adc3;
-    msg_obj.data[5] = adc3 >> 8;
+      msg_obj.msgobj  = 0;
+      msg_obj.mode_id = 0x413;
+      msg_obj.mask    = 0x0;
+      msg_obj.dlc     = 1;
+      msg_obj.data[0] = cmd;
 
-    LPC_CCAN_API->can_transmit(&msg_obj);
+      LPC_CCAN_API->can_transmit(&msg_obj);
 
-    // palTogglePad(GPIO1, GPIO1_LED1);
-    palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
+      chThdSleepMilliseconds(2);
+    }
+
+    cmd ^= 0b010; // toggle DIR
+
+    palTogglePad(GPIO1, GPIO1_LED1);
   }
 
   return 0;

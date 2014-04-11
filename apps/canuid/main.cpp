@@ -8,8 +8,8 @@
 #define LPC_ROM_API_BASE_LOC      0x1FFF1FF8
 #define LPC_ROM_API               (*(LPC_ROM_API_T**) LPC_ROM_API_BASE_LOC)
 
-#include "../../common/nxp/romapi_11xx.h"
-#include "../../common/nxp/ccand_11xx.h"
+#include "nxp/romapi_11xx.h"
+#include "nxp/ccand_11xx.h"
 
 CCAN_MSG_OBJ_T msg_obj0, msg_obj1;
 

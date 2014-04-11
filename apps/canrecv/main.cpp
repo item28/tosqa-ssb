@@ -8,8 +8,8 @@
 #define LPC_ROM_API_BASE_LOC      0x1FFF1FF8
 #define LPC_ROM_API               (*(LPC_ROM_API_T**) LPC_ROM_API_BASE_LOC)
 
-#include "../../common/nxp/romapi_11xx.h"
-#include "../../common/nxp/ccand_11xx.h"
+#include "nxp/romapi_11xx.h"
+#include "nxp/ccand_11xx.h"
 
 CCAN_MSG_OBJ_T msg_obj;
 
@@ -34,10 +34,7 @@ static void CAN_rxCallback (uint8_t msg_obj_num) {
 
 static void CAN_txCallback (uint8_t /* msg_obj_num */) {}
 
-static void CAN_errorCallback (uint32_t error_info) {
-  if (error_info & 0x0002)
-    palTogglePad(GPIO0, GPIO0_LED2);
-}
+static void CAN_errorCallback (uint32_t /* error_info */) {}
 
 static CCAN_CALLBACKS_T callbacks = {
   CAN_rxCallback,
