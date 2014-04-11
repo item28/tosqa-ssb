@@ -52,7 +52,7 @@ static void initCan () {
   NVIC_EnableIRQ(CAN_IRQn);
 }
 
-static uint16_t readAdc(uint8_t num) {
+static uint16_t readAdc (uint8_t num) {
   LPC_ADC->CR = 0x0B00 | (1 << num);// select AD1..3, set up clock (sec. 25.5.1)
   LPC_ADC->CR |= 1 << 24; // set "Start Conversion Now" bit (sec. 25.5.1)
   while (LPC_ADC->DR[num] < 0x7FFFFFFF)
@@ -81,12 +81,12 @@ int main () {
     msg_obj.mode_id = 0x456;
     msg_obj.mask    = 0x0;
     msg_obj.dlc     = 6;
-    msg_obj.data[0] = adc1 >> 8;
-    msg_obj.data[1] = adc1;
-    msg_obj.data[2] = adc2 >> 8;
-    msg_obj.data[3] = adc2;
-    msg_obj.data[4] = adc3 >> 8;
-    msg_obj.data[5] = adc3;
+    msg_obj.data[0] = adc1;
+    msg_obj.data[1] = adc1 >> 8;
+    msg_obj.data[2] = adc2;
+    msg_obj.data[3] = adc2 >> 8;
+    msg_obj.data[4] = adc3;
+    msg_obj.data[5] = adc3 >> 8;
 
     LPC_CCAN_API->can_transmit(&msg_obj);
 
