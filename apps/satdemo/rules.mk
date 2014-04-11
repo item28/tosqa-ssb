@@ -50,7 +50,7 @@ endif
 #
 
 # Define project name here
-PROJECT = ssb
+PROJECT = sat
 
 # Imported source files
 CHIBIOS = ../../../../ChibiOS/ChibiOS-RT
@@ -68,7 +68,7 @@ CSRC = $(PORTSRC) \
        $(KERNSRC) \
        $(HALSRC) \
        $(PLATFORMSRC) \
-       $(TOSQA_COMMON)/board.c \
+       board.c \
        $(CHIBIOS)/os/various/evtimer.c \
        $(CHIBIOS)/os/various/syscalls.c \
        $(SRC_C)

@@ -9,7 +9,7 @@ LPCX = /Applications/lpcxpresso_7.1.1_125//lpcxpresso/bin
 LINK_ARGS = -wire=winUSB -vendor=NXP -pLPC11C24/301 -g
 
 # upload commands, using utility code and data from the LPCXpresso IDE
-isp: build/firmware.bin
-	$(LPCX)/$(ISP) -flash-load-exec build/firmware.bin $(LINK_ARGS)
+isp: build/$(PROJECT).bin
+	$(LPCX)/$(ISP) -flash-load-exec build/$(PROJECT).bin $(LINK_ARGS)
 dfu:
 	$(LPCX)/dfu-util -d 0x471:0xdf55 -c 0 -t 2048 -R -D $(LPCX)/LPCXpressoWIN.enc

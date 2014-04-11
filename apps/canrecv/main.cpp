@@ -99,8 +99,6 @@ int main () {
   palClearPad(GPIO1, GPIO1_MOTOR_DIR);
   palClearPad(GPIO0, GPIO0_MOTOR_STEP);
 
-  chThdSleepMilliseconds(50);
-
   /* Configure message object 1 to receive all 11-bit messages 0x410-0x413 */
   msg_obj.msgobj = 1;
   msg_obj.mode_id = 0x410;
