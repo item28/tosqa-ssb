@@ -4,6 +4,7 @@
 #include "ch.h"
 #include "hal.h"
 #include "aoa/oled.h"
+#include "chprintf.h"
 
 #define IAP_ENTRY_LOCATION        0X1FFF1FF1
 #define LPC_ROM_API_BASE_LOC      0x1FFF1FF8
@@ -97,6 +98,10 @@ int main () {
   chThdSleepMilliseconds(1000);
   
   static char buf[17];
+  chsnprintf(buf, sizeof buf, "X %08x Y", 1234567);
+  sendStrXY(buf, 0, 0);
+  chThdSleepMilliseconds(1000);
+  
   for (int y = 0; ; ++y) {
     chThdSleepMilliseconds(500);
     for (int x = 0; x < 16; ++x)

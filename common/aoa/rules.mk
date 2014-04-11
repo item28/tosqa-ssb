@@ -41,6 +41,8 @@ endif
 # Architecture or project specific options
 #
 
+BOARDINC = $(TOSQA_COMMON)/aoa
+
 #
 # Architecture or project specific options
 ##############################################################################
@@ -68,9 +70,11 @@ CSRC = $(PORTSRC) \
        $(KERNSRC) \
        $(HALSRC) \
        $(PLATFORMSRC) \
-       board.c \
+       $(TOSQA_COMMON)/aoa/board.c \
        $(CHIBIOS)/os/various/evtimer.c \
        $(CHIBIOS)/os/various/syscalls.c \
+       $(CHIBIOS)/os/various/memstreams.c \
+       $(CHIBIOS)/os/various/chprintf.c \
        $(SRC_C)
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
