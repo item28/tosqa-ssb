@@ -52,7 +52,7 @@ BOARDINC = $(TOSQA_COMMON)/aoa
 #
 
 # Define project name here
-PROJECT = sat
+PROJECT = aoasat
 
 # Imported source files
 CHIBIOS = ../../../../ChibiOS/ChibiOS-RT
