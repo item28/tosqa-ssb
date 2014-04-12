@@ -120,7 +120,7 @@ int main () {
       msg_recv.data[0], msg_recv.data[1], msg_recv.data[2], msg_recv.data[3],
       msg_recv.data[4], msg_recv.data[5], msg_recv.data[6], msg_recv.data[7]);
     for (int i = msg_obj.dlc; i < 8; ++i)
-      buf[2*i] = buf[2*i+1] = 0; // clear display past the received bytes
+      buf[2*i] = buf[2*i+1] = ' '; // clear display past the received bytes
     sendStrXY(buf, line + 1, 0);
     
     // release message buffer for re-use - since display updating is slow, some
