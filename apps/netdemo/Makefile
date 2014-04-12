@@ -75,6 +75,8 @@ CSRC = $(PORTSRC) \
        board.c \
        $(LWSRC) \
        $(CHIBIOS)/os/various/evtimer.c \
+       $(CHIBIOS)/os/various/shell.c \
+       $(CHIBIOS)/os/various/chprintf.c \
        web/web.c main.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
