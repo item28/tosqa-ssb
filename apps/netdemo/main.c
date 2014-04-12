@@ -108,6 +108,30 @@ static void cmd_test(BaseSequentialStream *chp, int argc, char *argv[]) {
 }
 
 /*
+ * Transmitter thread.
+ */
+static WORKING_AREA(can_tx_wa, 256);
+static msg_t can_tx(void * p) {
+  CANTxFrame txmsg_can1;
+  (void)p;
+  chRegSetThreadName("transmitter");
+  txmsg_can1.IDE = CAN_IDE_STD;
+  txmsg_can1.EID = 0x412;
+  txmsg_can1.RTR = CAN_RTR_DATA;
+  txmsg_can1.DLC = 1;
+
+  while (!chThdShouldTerminate()) {
+    txmsg_can1.data8[0] = 0x05;
+    canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, MS2ST(1000));
+    chThdSleepMilliseconds(10);
+    txmsg_can1.data8[0] = 0x04;
+    canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, MS2ST(1000));
+    chThdSleepMilliseconds(500);
+  }
+  return 0;
+}
+
+/*
  * Application entry point.
  */
 int main(void) {
@@ -128,9 +152,24 @@ int main(void) {
   sdStart(&SD1, NULL);
 
   /*
+   * Activates CAN driver 1.
+   */
+  static const CANConfig cancfg = {
+    0,
+    CANBTR_SJW(0) | CANBTR_TESG2(1) |
+    CANBTR_TESG1(8) | CANBTR_BRP(19)
+  };
+  canStart(&CAND1, &cancfg);
+
+  /*
    * Creates the blinker thread.
    */
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
+  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, can_tx, NULL);
+
+  /*
+   * Creates the CAN transmit thread.
+   */
+  chThdCreateStatic(can_tx_wa, sizeof(can_tx_wa), NORMALPRIO, Thread1, NULL);
 
   /*
    * Creates the LWIP threads (it changes priority internally).
@@ -144,7 +183,7 @@ int main(void) {
   chThdCreateStatic(wa_http_server, sizeof(wa_http_server), NORMALPRIO + 1,
                     http_server, NULL);
 
-  chprintf(chp1, "\n[satmon]\n");
+  chprintf(chp1, "\r\n[satmon]\r\n");
 
   static const ShellCommand commands[] = {
     // {"pwrdown", cmd_pwrdown},
