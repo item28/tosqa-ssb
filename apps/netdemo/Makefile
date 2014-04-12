@@ -198,3 +198,14 @@ ULIBS =
 ##############################################################################
 
 include $(CHIBIOS)/os/ports/GCC/ARMCMx/rules.mk
+
+# ISP programming uses redlinkserv, which must be launched by the LPCX IDE
+ISP = crt_emu_cm_redlink  # use this with an LPCLink 2
+
+# paths and settings used for uploading
+LPCX = /Applications/lpcxpresso_7.1.1_125//lpcxpresso/bin
+LINK_ARGS = -wire=winUSB -vendor=NXP -pLPC1769 -g
+
+# upload commands, using utility code and data from the LPCXpresso IDE
+isp: build/$(PROJECT).bin
+	$(LPCX)/$(ISP) -flash-load-exec build/$(PROJECT).bin $(LINK_ARGS)
