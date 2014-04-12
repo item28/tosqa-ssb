@@ -11,7 +11,7 @@
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
-CCAN_MSG_OBJ_T msg_obj0, msg_obj1;
+CCAN_MSG_OBJ_T msg_obj;
 
 static void CAN_rxCallback (uint8_t /* msg_obj_num */) {}
 
@@ -81,40 +81,41 @@ int main () {
   uint32_t uid[4];
   readUid(uid);
   
-  msg_obj0.msgobj  = 0;
-  msg_obj0.mode_id = 0x414;
-  msg_obj0.mask    = 0x0;
-  msg_obj0.dlc     = 8;
-  msg_obj0.data[0] = uid[0];
-  msg_obj0.data[1] = uid[0] >> 8;
-  msg_obj0.data[2] = uid[0] >> 16;
-  msg_obj0.data[3] = uid[0] >> 24;
-  msg_obj0.data[4] = uid[1];
-  msg_obj0.data[5] = uid[1] >> 8;
-  msg_obj0.data[6] = uid[1] >> 16;
-  msg_obj0.data[7] = uid[1] >> 24;
-
-  LPC_CCAN_API->can_transmit(&msg_obj0);
-
-  msg_obj1.msgobj  = 1;
-  msg_obj1.mode_id = 0x415;
-  msg_obj1.mask    = 0x0;
-  msg_obj1.dlc     = 8;
-  msg_obj1.data[0] = uid[2];
-  msg_obj1.data[1] = uid[2] >> 8;
-  msg_obj1.data[2] = uid[2] >> 16;
-  msg_obj1.data[3] = uid[2] >> 24;
-  msg_obj1.data[4] = uid[3];
-  msg_obj1.data[5] = uid[3] >> 8;
-  msg_obj1.data[6] = uid[3] >> 16;
-  msg_obj1.data[7] = uid[3] >> 24;
-
-  LPC_CCAN_API->can_transmit(&msg_obj1);
-
   for (;;) {
+    msg_obj.msgobj  = 1;
+    msg_obj.mode_id = 0x414;
+    msg_obj.mask    = 0x0;
+    msg_obj.dlc     = 8;
+    msg_obj.data[0] = uid[0];
+    msg_obj.data[1] = uid[0] >> 8;
+    msg_obj.data[2] = uid[0] >> 16;
+    msg_obj.data[3] = uid[0] >> 24;
+    msg_obj.data[4] = uid[1];
+    msg_obj.data[5] = uid[1] >> 8;
+    msg_obj.data[6] = uid[1] >> 16;
+    msg_obj.data[7] = uid[1] >> 24;
+
+    LPC_CCAN_API->can_transmit(&msg_obj);
     chThdSleepMilliseconds(500);
-    // palTogglePad(GPIO1, GPIO1_LED1);
-    palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
+
+    msg_obj.msgobj  = 2;
+    msg_obj.mode_id = 0x415;
+    msg_obj.mask    = 0x0;
+    msg_obj.dlc     = 8;
+    msg_obj.data[0] = uid[2];
+    msg_obj.data[1] = uid[2] >> 8;
+    msg_obj.data[2] = uid[2] >> 16;
+    msg_obj.data[3] = uid[2] >> 24;
+    msg_obj.data[4] = uid[3];
+    msg_obj.data[5] = uid[3] >> 8;
+    msg_obj.data[6] = uid[3] >> 16;
+    msg_obj.data[7] = uid[3] >> 24;
+
+    LPC_CCAN_API->can_transmit(&msg_obj);
+    chThdSleepMilliseconds(500);
+
+    palTogglePad(GPIO1, GPIO1_LED1);
+    // palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
   }
 
   return 0;
