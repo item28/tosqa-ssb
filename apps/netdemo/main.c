@@ -174,14 +174,14 @@ int main(void) {
   /*
    * Creates the LWIP threads (it changes priority internally).
    */
-  chThdCreateStatic(wa_lwip_thread, LWIP_THREAD_STACK_SIZE, NORMALPRIO + 1,
-                    lwip_thread, NULL);
+  // chThdCreateStatic(wa_lwip_thread, LWIP_THREAD_STACK_SIZE, NORMALPRIO + 1,
+  //                   lwip_thread, NULL);
 
   /*
    * Creates the HTTP thread (it changes priority internally).
    */
-  chThdCreateStatic(wa_http_server, sizeof(wa_http_server), NORMALPRIO + 1,
-                    http_server, NULL);
+  // chThdCreateStatic(wa_http_server, sizeof(wa_http_server), NORMALPRIO + 1,
+  //                   http_server, NULL);
 
   chprintf(chp1, "\r\n[satmon]\r\n");
 
