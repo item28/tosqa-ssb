@@ -62,14 +62,14 @@ static void initCan () {
   NVIC_EnableIRQ(CAN_IRQn);
 }
 
-// keep a LED blinking at 2 Hz in the background
+// keep a LED flashing at 1 Hz in the background, but very briefly and dimly
 static WORKING_AREA(waBlinkTh, 64);
 static msg_t BlinkTh (void*) {
   for (;;) {
     palTogglePad(GPIO0, GPIO0_LED);
     chThdSleepMilliseconds(999);
     palTogglePad(GPIO0, GPIO0_LED);
-    chThdSleepMilliseconds(1); // very dim 1s blink
+    chThdSleepMilliseconds(1);
   }
   return 0;
 }
@@ -80,7 +80,7 @@ int main () {
   initCan();
   
   static const I2CConfig i2cconfig = { I2C_FAST_MODE_PLUS, 2000000 };
-  i2cStart(&I2CD1, &i2cconfig);
+  i2cStart(&I2CD1, &i2cconfig); // 2 MHz seems to work fine for this display
 
   init_OLED();
   
@@ -107,9 +107,9 @@ int main () {
       chThdYield(); // wait until data available from receiver interrupt
     int line = (y * 2) % 6;
 
-    palTogglePad(GPIO0, GPIO0_LEDB); // blue LED on, very briefly
-    sendStrXY(" ", (line + 4) % 6, 0); // clear the previous cursor
-    palTogglePad(GPIO0, GPIO0_LEDB); // blue LED off again
+    palTogglePad(GPIO0, GPIO0_LEDB);    // blue LED on, very briefly
+    sendStrXY(" ", (line + 4) % 6, 0);  // clear the previous cursor
+    palTogglePad(GPIO0, GPIO0_LEDB);    // blue LED off again
     
     // display first line
     chsnprintf(buf, sizeof buf, ">%03x            ", msg_recv.mode_id);
@@ -120,11 +120,11 @@ int main () {
       msg_recv.data[0], msg_recv.data[1], msg_recv.data[2], msg_recv.data[3],
       msg_recv.data[4], msg_recv.data[5], msg_recv.data[6], msg_recv.data[7]);
     for (int i = msg_obj.dlc; i < 8; ++i)
-      buf[2*i] = buf[2*i+1] = 0; // clear bytes past the received data
+      buf[2*i] = buf[2*i+1] = 0; // clear display past the received bytes
     sendStrXY(buf, line + 1, 0);
     
-    // release message buffer for re-use - since the display is slow, this
-    // may lead to lost messages, i.e. received but not shown on the display
+    // release message buffer for re-use - since display updating is slow, some
+    // received messages may have been dropped during the above update cycle
     received = false;
   }
 
