@@ -117,7 +117,6 @@ static msg_t can_tx(void * p) {
   txmsg_can1.IDE = CAN_IDE_STD;
   txmsg_can1.EID = 0x412;
   txmsg_can1.RTR = CAN_RTR_DATA;
-  txmsg_can1.DLC = 1;
   
   // read the trimpot via ADC to decide what step commands to send out
   // uses low-level access to implement the simplest possible polled readout
@@ -131,27 +130,37 @@ static msg_t can_tx(void * p) {
   // set up the ADC and pin
   LPC_SC->PCONP |= (1UL << 12);       // enable ADC power
   LPC_ADC->CR = AD0CR_PDN | (LPC17xx_ADC_CLKDIV << 8) | AD0CR_CHANNEL5;
-  LPC_ADC->INTEN = 0; // no interrupts
   LPC_PINCON->PINSEL3 |= 0b11 << 30;  // enable P1.31 as AD0.5
 
+  uint8_t lastCmd = 0;
   while (!chThdShouldTerminate()) {
     // perform one ADC conversion
     LPC_ADC->CR &= ~AD0CR_START_MASK;
     LPC_ADC->CR |= AD0CR_START_NOW;
     while ((LPC_ADC->GDR & (1<<31)) == 0)
       ;
-    int sample = ((LPC_ADC->GDR >> 4) & 0xFFF) - 0x800;
+    int sample = ((LPC_ADC->GDR >> 4) & 0xFFF) - 0x800; // signed
     
-    txmsg_can1.DLC = 2;
-    txmsg_can1.data8[0] = sample >> 8;
-    txmsg_can1.data8[1] = sample;
-
-    // txmsg_can1.data8[0] = 0x05;
+    uint8_t cmd = 0x04; // enable
+    if (sample < 0) {
+      cmd ^= 0x02; // direction
+      sample = -sample;
+    }
+    if (sample < 100)
+      continue; // dead zone, no stepping
+    if (cmd != lastCmd) {
+      // transmit a 1-byte "command" packet with the enable and direction bits
+      txmsg_can1.DLC = 1;
+      txmsg_can1.data8[0] = lastCmd = cmd;
+    } else {
+      sample /= 2; // >= 50
+      // transmit a 0-byte "step" packet, but delay 1..950 ms before doing so
+      if (sample > 999)
+        sample = 999;
+      chThdSleepMilliseconds(1000-sample);
+      txmsg_can1.DLC = 0;
+    }
     canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, MS2ST(1000));
-    // chThdSleepMilliseconds(1);
-    // txmsg_can1.data8[0] = 0x04;
-    // canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, MS2ST(1000));
-    chThdSleepMilliseconds(500);
   }
   return 0;
 }
