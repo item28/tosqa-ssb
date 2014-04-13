@@ -90,8 +90,8 @@ int main () {
 
     LPC_CCAN_API->can_transmit(&msg_obj);
 
-    // palTogglePad(GPIO1, GPIO1_LED1);
-    palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
+    palTogglePad(GPIO1, GPIO1_LED1);
+    // palTogglePad(GPIO3, GPIO3_MOTOR_MS1);
   }
 
   return 0;
