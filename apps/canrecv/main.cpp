@@ -55,10 +55,11 @@ static CCAN_CALLBACKS_T callbacks = {
   NULL,
 };
 
-// void CAN_IRQHandler (void) {
 extern "C" void Vector74 ();
-void Vector74 () {
+CH_IRQ_HANDLER(Vector74)  {
+  CH_IRQ_PROLOGUE();
   LPC_CCAN_API->isr();
+  CH_IRQ_EPILOGUE();
 }
 
 static void initCan () {
