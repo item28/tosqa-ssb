@@ -28,16 +28,14 @@
 BaseSequentialStream* chp1 = (BaseSequentialStream*) &SD1;
 
 /*
- * Green LED blinker thread, times are in milliseconds.
+ * Red LED blinker thread, times are in milliseconds.
  */
 static WORKING_AREA(waThread1, 128);
 static msg_t Thread1 (void *arg) {
   (void)arg;
   chRegSetThreadName("blinker");
   while (TRUE) {
-    palClearPad(GPIO2, GPIO2_RGB1_RED);
-    chThdSleepMilliseconds(500);
-    palSetPad(GPIO2, GPIO2_RGB1_RED);
+    palTogglePad(GPIO2, GPIO2_RGB1_RED);
     chThdSleepMilliseconds(500);
   }
   return 0;
@@ -108,9 +106,10 @@ static void cmd_test(BaseSequentialStream *chp, int argc, char *argv[]) {
 }
 
 /*
- * Transmitter thread.
+ * CAN transmitter thread.
  */
 static WORKING_AREA(can_tx_wa, 256);
+
 static msg_t can_tx(void * p) {
   CANTxFrame txmsg_can1;
   (void)p;
@@ -119,13 +118,39 @@ static msg_t can_tx(void * p) {
   txmsg_can1.EID = 0x412;
   txmsg_can1.RTR = CAN_RTR_DATA;
   txmsg_can1.DLC = 1;
+  
+  // read the trimpot via ADC to decide what step commands to send out
+  // uses low-level access to implement the simplest possible polled readout
+
+#define AD0CR_PDN                   (1UL << 21)
+#define AD0CR_START_NOW             (1UL << 24)
+#define AD0CR_CHANNEL5              (1UL << 5)
+#define LPC17xx_ADC_CLKDIV          12
+#define AD0CR_START_MASK            (7UL << 24)
+  
+  // set up the ADC and pin
+  LPC_SC->PCONP |= (1UL << 12);       // enable ADC power
+  LPC_ADC->CR = AD0CR_PDN | (LPC17xx_ADC_CLKDIV << 8) | AD0CR_CHANNEL5;
+  LPC_ADC->INTEN = 0; // no interrupts
+  LPC_PINCON->PINSEL3 |= 0b11 << 30;  // enable P1.31 as AD0.5
 
   while (!chThdShouldTerminate()) {
-    txmsg_can1.data8[0] = 0x05;
+    // perform one ADC conversion
+    LPC_ADC->CR &= ~AD0CR_START_MASK;
+    LPC_ADC->CR |= AD0CR_START_NOW;
+    while ((LPC_ADC->GDR & (1<<31)) == 0)
+      ;
+    int sample = ((LPC_ADC->GDR >> 4) & 0xFFF) - 0x800;
+    
+    txmsg_can1.DLC = 2;
+    txmsg_can1.data8[0] = sample >> 8;
+    txmsg_can1.data8[1] = sample;
+
+    // txmsg_can1.data8[0] = 0x05;
     canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, MS2ST(1000));
-    chThdSleepMilliseconds(10);
-    txmsg_can1.data8[0] = 0x04;
-    canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, MS2ST(1000));
+    // chThdSleepMilliseconds(1);
+    // txmsg_can1.data8[0] = 0x04;
+    // canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, MS2ST(1000));
     chThdSleepMilliseconds(500);
   }
   return 0;
