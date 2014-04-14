@@ -1,4 +1,4 @@
-// ssb11 stepper - test stepper motor pulsing
+// ssb11 digipot - move digital vref pot through its entire range
 // jcw, 2014-04-10
 
 #include "ch.h"
