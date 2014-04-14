@@ -1,5 +1,5 @@
 // ssb11 digipot - move digital vref pot through its entire range
-// jcw, 2014-04-10
+// jcw, 2014-04-14
 
 #include "ch.h"
 #include "hal.h"
@@ -28,21 +28,20 @@ int main () {
 
   // send 64 pulses to move the digipot, then reverse direction
   for (;;) {
-    palTogglePad(GPIO1, GPIO1_DIGIPOT_UD);
     chThdSleepMilliseconds(1);
     palClearPad(GPIO3, GPIO3_DIGIPOT_CS);
     chThdSleepMilliseconds(1);
-    for (int i = 0; i < 64; ++i) {
+    for (int i = 0; i < 65; ++i) {
       palTogglePad(GPIO1, GPIO1_DIGIPOT_UD);
       chThdSleepMilliseconds(1);
       palTogglePad(GPIO1, GPIO1_DIGIPOT_UD);
-      chThdSleepMilliseconds(98);
+      chThdSleepMilliseconds(99);
     }
     palSetPad(GPIO3, GPIO3_DIGIPOT_CS);
     chThdSleepMilliseconds(1);
 
     // switch direction and LEDs
-    palTogglePad(GPIO1, GPIO1_MOTOR_DIR);
+    palTogglePad(GPIO1, GPIO1_DIGIPOT_UD);
     palTogglePad(GPIO1, GPIO1_LED1);
     palTogglePad(GPIO0, GPIO0_LED2);
   }
