@@ -15,46 +15,8 @@
 
 CCAN_MSG_OBJ_T msg_obj;
 
-static void CAN_rxCallback (uint8_t /* msg_obj_num */) {}
-
-static void CAN_txCallback (uint8_t /* msg_obj_num */) {}
-
-static void CAN_errorCallback (uint32_t error_info) {
-  if (error_info & 0x0002)
-    palTogglePad(GPIO3, 1); // turn on LED2 on Open11C14 board
-}
-
-static CCAN_CALLBACKS_T callbacks = {
-  CAN_rxCallback,
-  CAN_txCallback,
-  CAN_errorCallback,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-};
-
-extern "C" void Vector74 ();
-CH_IRQ_HANDLER(Vector74)  {
-  CH_IRQ_PROLOGUE();
-  LPC_CCAN_API->isr();
-  CH_IRQ_EPILOGUE();
-}
-
-static void initCan () {
-  LPC_SYSCON->SYSAHBCLKCTRL |= 1 << 17; // SYSCTL_CLOCK_CAN
-
-  static uint32_t clkInitTable[2] = {
-    0x00000000UL, // CANCLKDIV, running at 48 MHz
-    // 0x000076C5UL  // CAN_BTR, 500 Kbps CAN bus rate
-    0x000076DDUL  // CAN_BTR, 100 Kbps CAN bus rate
-  };
-
-  LPC_CCAN_API->init_can(clkInitTable, true);
-  LPC_CCAN_API->config_calb(&callbacks);
-  NVIC_EnableIRQ(CAN_IRQn);
-}
+#include "canopen.h"
+#include "canbase.h"
 
 int main () {
   halInit();
@@ -65,13 +27,18 @@ int main () {
   palTogglePad(GPIO0, GPIO0_LED2);
   chThdSleepMilliseconds(100);
   palTogglePad(GPIO0, GPIO0_LED2);
+  
+  /* Configure message object 1 to receive all 11-bit messages 0x5FD */
+  msg_obj.msgobj = 1;
+  msg_obj.mode_id = 0x5FD;
+  msg_obj.mask = 0x7FF;
+  LPC_CCAN_API->config_rxmsgobj(&msg_obj);
 
   int i = 0;
-  
   for (;;) {
     // ....
     msg_obj.msgobj  = 1;
-    msg_obj.mode_id = 0x414;
+    msg_obj.mode_id = 0x67D;
     msg_obj.mask    = 0x0;
     msg_obj.dlc     = 8;
     memcpy(msg_obj.data, bootData + 8 * i++, 8);
