@@ -42,7 +42,6 @@
  * GPIO 0 initial setup.
  */
 #define VAL_GPIO0DIR \
-                                PAL_PORT_BIT(GPIO0_BOOT_SEL)              | \
                                 PAL_PORT_BIT(GPIO0_ENDSTOP1)              | \
                                 PAL_PORT_BIT(GPIO0_ENDSTOP_SCL)           | \
                                 PAL_PORT_BIT(GPIO0_ENDSTOP_SDA)           | \
@@ -52,7 +51,6 @@
                                 PAL_PORT_BIT(GPIO0_MOTOR_STEP)            | \
                       0
 #define VAL_GPIO0DATA \
-                                PAL_PORT_BIT(GPIO0_BOOT_SEL)              | \
                                 PAL_PORT_BIT(GPIO0_ENDSTOP1)              | \
                                 PAL_PORT_BIT(GPIO0_ENDSTOP_SCL)           | \
                                 PAL_PORT_BIT(GPIO0_ENDSTOP_SDA)           | \
