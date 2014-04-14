@@ -8,13 +8,9 @@ int main () {
     halInit();
     chSysInit();
 
-    palClearPad(GPIO1, GPIO1_LED1);
-    palSetPad(GPIO0, GPIO0_LED2);
-
     for (;;) {
-        chThdSleepMilliseconds(500);
-
         palTogglePad(GPIO1, GPIO1_LED1);
+        chThdSleepMilliseconds(500);
         palTogglePad(GPIO0, GPIO0_LED2);
     }
 
