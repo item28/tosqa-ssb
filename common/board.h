@@ -92,7 +92,6 @@
                                 PAL_PORT_BIT(GPIO2_HALL_SPI_SCK)          | \
                       0
 #define VAL_GPIO2DATA \
-                                PAL_PORT_BIT(GPIO2_BOOT_AUTORESET)        | \
                                 PAL_PORT_BIT(GPIO2_ENDSTOP0)              | \
                                 PAL_PORT_BIT(GPIO2_ENDSTOP_I2C)           | \
                                 PAL_PORT_BIT(GPIO2_HALL_MODE)             | \
