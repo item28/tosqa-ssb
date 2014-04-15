@@ -153,6 +153,7 @@ int main () {
   // erase sectors
   sdoWriteExpedited(0x5030, 0, 0x0000, 2);
 
+#if 1
   // start write to RAM
   sdoWriteExpedited(0x5015, 0, 0x10001000, 4); // ram address
   // upload code to RAM
@@ -169,6 +170,7 @@ int main () {
   sdoWriteExpedited(0x5050, 1, 0x00000000, 4); // flash address
   sdoWriteExpedited(0x5050, 2, 0x10001000, 4); // ram address
   sdoWriteExpedited(0x5050, 3, 0x1000, 2); // 4096 bytes
+#endif
   
   // G 0000
   sdoWriteExpedited(0x5070, 0, 0, 4);

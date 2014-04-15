@@ -53,6 +53,6 @@ func main() {
 		s += t
 	}
 	fmt.Println(s)
-	fmt.Println("0,0,0,0,0,0,0,0,") // extra bytes for the boot loader (why?)
+	fmt.Println("  0,0,0,0,0,0,0,0,") // extra bytes for the boot loader (why?)
 	fmt.Println("};")
 }
