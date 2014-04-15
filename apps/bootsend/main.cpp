@@ -13,12 +13,12 @@
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
-CCAN_MSG_OBJ_T msg_obj, msg_SDO_Seg_TX;
+CCAN_MSG_OBJ_T rxMsg, txMsg;
 volatile bool ready;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
-  msg_obj.msgobj = msg_obj_num;
-  LPC_CCAN_API->can_receive(&msg_obj);
+  rxMsg.msgobj = msg_obj_num;
+  LPC_CCAN_API->can_receive(&rxMsg);
   palTogglePad(GPIO3, GPIO3_MOTOR_EN); // PIO3_0 = LED1 on Open11C14 board
   ready = true;
 }
@@ -74,31 +74,51 @@ static msg_t BlinkTh (void*) {
   return 0;
 }
 
-static void sendAndWait(uint8_t node_id, uint16_t index, uint8_t subindex, const uint8_t* data, int length) {
-	msg_SDO_Seg_TX.mode_id = 0x600 + node_id;
-	msg_SDO_Seg_TX.mask = 0x00;
-	msg_SDO_Seg_TX.dlc = 8;
-	msg_SDO_Seg_TX.msgobj = 8;
-  // msg_SDO_Seg_TX.data[0] = 1<<5 | (4-length)<<2 | 0x02 | 0x01;
-  msg_SDO_Seg_TX.data[0] = 2<<5; // SDO read
-	msg_SDO_Seg_TX.data[1] = index;
-	msg_SDO_Seg_TX.data[2] = index >> 8;
-	msg_SDO_Seg_TX.data[3] = subindex;
-	msg_SDO_Seg_TX.data[4] = 0x00;
-	msg_SDO_Seg_TX.data[5] = 0x00;
-	msg_SDO_Seg_TX.data[6] = 0x00;
-	msg_SDO_Seg_TX.data[7] = 0x00;
+static void sendAndWait(uint8_t header, uint16_t index, uint8_t subindex, const uint8_t* data, int length) {
+  txMsg.mode_id = 0x67D;
+	txMsg.mask = 0x00;
+	txMsg.dlc = 8;
+	txMsg.msgobj = 8;
+  txMsg.data[0] = header;
+  txMsg.data[0] = header;
+	txMsg.data[1] = index;
+	txMsg.data[2] = index >> 8;
+	txMsg.data[3] = subindex;
+  for (int i = 0; i < 4; ++i)
+		txMsg.data[4+i] = i < length ? *data++ : 0;
 
-  while (--length >= 0)
-		msg_SDO_Seg_TX.data[length+4] = *data++;
-
-	LPC_CCAN_API->can_transmit(&msg_SDO_Seg_TX);
-
+  ready = false;
+	LPC_CCAN_API->can_transmit(&txMsg);
   palTogglePad(GPIO3, GPIO3_DIGIPOT_CS); // LED2 on Open11C14 board
   while (!ready)
     chThdYield();
   palTogglePad(GPIO3, GPIO3_DIGIPOT_CS);
 }
+
+static uint8_t zero[4];
+
+// not supported by LPC CAN boot loader?
+// uint32_t sdoReadExpedited(uint16_t index, uint8_t subindex, uint8_t length) {
+//   sendAndWait((2<<5) | ((4-length)<<2) | 0b11, index, subindex, zero, length);
+//   return (rxMsg.data[7] << 24) | (rxMsg.data[6] << 16) |
+//           (rxMsg.data[5] << 8) | rxMsg.data[4];
+// }
+
+void sdoWriteExpedited(uint16_t index, uint8_t subindex, const uint8_t* data, uint8_t length) {
+  sendAndWait((1<<5) | ((4-length)<<2) | 0b11, index, subindex, data, length);
+}
+
+uint32_t sdoReadSegmented(uint16_t index, uint8_t subindex) {
+  sendAndWait(0x40, index, subindex, zero, 4);
+  return (rxMsg.data[7] << 24) | (rxMsg.data[6] << 16) |
+          (rxMsg.data[5] << 8) | rxMsg.data[4];
+}
+
+void sdoWriteSegmented(uint16_t index, uint8_t subindex, int length) {
+  sendAndWait(0x21, index, subindex, (uint8_t*) &length, 4);
+}
+
+uint32_t result;
 
 int main () {
   halInit();
@@ -114,23 +134,20 @@ int main () {
   chThdCreateStatic(waBlinkTh, sizeof(waBlinkTh), NORMALPRIO, BlinkTh, NULL);
   
   /* Configure message object 1 to receive all 11-bit messages 0x5FD */
-  msg_obj.msgobj = 1;
-  msg_obj.mode_id = 0x5FD;
-  msg_obj.mask = 0x7FF;
-  LPC_CCAN_API->config_rxmsgobj(&msg_obj);
-  sendAndWait(0x7D, 0x1000, 0, 0, 0);
-
-  // int i = 0;
-  // // ....
-  // msg_obj.msgobj  = 1;
-  // msg_obj.mode_id = 0x67D;
-  // msg_obj.mask    = 0x0;
-  // msg_obj.dlc     = 8;
-  // memcpy(msg_obj.data, bootData + 8 * i++, 8);
-  // LPC_CCAN_API->can_transmit(&msg_obj);
+  static CCAN_MSG_OBJ_T msg;
+  msg.msgobj = 1;
+  msg.mode_id = 0x5FD;
+  msg.mask = 0x7FF;
+  LPC_CCAN_API->config_rxmsgobj(&msg);
+  
+  // result = sdoReadExpedited(0x1000, 0, 4);
+  result = sdoReadSegmented(0x1000, 0);
+  uint16_t unlock = 23130;
+  sdoWriteExpedited(0x5000, 0, (uint8_t*) &unlock, sizeof unlock);
+  // sdoWriteSegmented(0x5000, 0, sizeof unlock);
 
   for (;;) {
-    chThdSleepMilliseconds(500);
+    chThdSleepMilliseconds(500 + result);
   }
 
   return 0;
