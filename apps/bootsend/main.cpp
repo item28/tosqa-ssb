@@ -176,6 +176,9 @@ int main () {
   sdoWriteExpedited(0x5070, 0, 0, 4);
   sdoWriteExpedited(0x1F51, 1, 1, 1);
 
+  // disable CAN so that it no longer interferes with other CAN traffic
+  LPC_SYSCON->SYSAHBCLKCTRL &= ~(1<<17); // SYSCTL_CLOCK_CAN
+
   // blink LED at 2 Hz
   for (;;) {
     chThdSleepMilliseconds(500);

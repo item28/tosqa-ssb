@@ -1,4 +1,5 @@
 * **blinker** - alternating blink of the ok/bad LEDs on the SSB
+* **bootsend** - upload code to an LPC11C24 in ROM-based CAN boot mode
 * **canrecv** - copy received CAN data to motor pins
 * **cansend** - periodic send of three ADC readouts
 * **canuid** - send out the LPC11C24's unique device id
