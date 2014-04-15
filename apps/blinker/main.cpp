@@ -12,7 +12,7 @@ int main () {
         palTogglePad(GPIO2, GPIO2_HALL_MODE); // LED on LPC11C24-DK-A
 
         palTogglePad(GPIO1, GPIO1_LED1);
-        chThdSleepMilliseconds(500);
+        chThdSleepMilliseconds(250);
         palTogglePad(GPIO0, GPIO0_LED2);
     }
 
