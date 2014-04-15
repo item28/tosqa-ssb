@@ -104,8 +104,8 @@ static uint8_t zero[4];
 //           (rxMsg.data[5] << 8) | rxMsg.data[4];
 // }
 
-void sdoWriteExpedited(uint16_t index, uint8_t subindex, const uint8_t* data, uint8_t length) {
-  sendAndWait((1<<5) | ((4-length)<<2) | 0b11, index, subindex, data, length);
+void sdoWriteExpedited(uint16_t index, uint8_t subindex, const uint32_t data, uint8_t length) {
+  sendAndWait((1<<5) | ((4-length)<<2) | 0b11, index, subindex, (uint8_t*) &data, length);
 }
 
 uint32_t sdoReadSegmented(uint16_t index, uint8_t subindex) {
@@ -114,11 +114,11 @@ uint32_t sdoReadSegmented(uint16_t index, uint8_t subindex) {
           (rxMsg.data[5] << 8) | rxMsg.data[4];
 }
 
-void sdoWriteSegmented(uint16_t index, uint8_t subindex, int length) {
-  sendAndWait(0x21, index, subindex, (uint8_t*) &length, 4);
-}
+// void sdoWriteSegmented(uint16_t index, uint8_t subindex, int length) {
+//   sendAndWait(0x21, index, subindex, (uint8_t*) &length, 4);
+// }
 
-uint32_t result;
+uint32_t devType, uid[4];
 
 int main () {
   halInit();
@@ -139,15 +139,27 @@ int main () {
   msg.mode_id = 0x5FD;
   msg.mask = 0x7FF;
   LPC_CCAN_API->config_rxmsgobj(&msg);
-  
-  // result = sdoReadExpedited(0x1000, 0, 4);
-  result = sdoReadSegmented(0x1000, 0);
+
+  // read device type ("LPC1")
+  devType = sdoReadSegmented(0x1000, 0);
+  // unlock for upload
   uint16_t unlock = 23130;
-  sdoWriteExpedited(0x5000, 0, (uint8_t*) &unlock, sizeof unlock);
-  // sdoWriteSegmented(0x5000, 0, sizeof unlock);
+  sdoWriteExpedited(0x5000, 0, unlock, sizeof unlock);
+  // read 16-byte serial number
+  uid[0] = sdoReadSegmented(0x5100, 1);
+  uid[1] = sdoReadSegmented(0x5100, 2);
+  uid[2] = sdoReadSegmented(0x5100, 3);
+  uid[3] = sdoReadSegmented(0x5100, 4);
+  // prepare sectors
+  sdoWriteExpedited(0x5020, 0, 0x0000, 2);
+  // erase sectors
+  sdoWriteExpedited(0x5030, 0, 0x0000, 2);
+  // G 0000
+  sdoWriteExpedited(0x5070, 0, 0, 4);
+  sdoWriteExpedited(0x1F51, 1, 1, 1);
 
   for (;;) {
-    chThdSleepMilliseconds(500 + result);
+    chThdSleepMilliseconds(500);
   }
 
   return 0;
