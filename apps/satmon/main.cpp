@@ -13,14 +13,14 @@
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
-CCAN_MSG_OBJ_T msg_obj, msg_recv;
+CCAN_MSG_OBJ_T msg_obj, rxMsg;
 volatile bool received;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
   msg_obj.msgobj = msg_obj_num;
   LPC_CCAN_API->can_receive(&msg_obj);
   if (!received) {
-    msg_recv = msg_obj;
+    rxMsg = msg_obj;
     received = true;
   }
 }
@@ -93,10 +93,10 @@ int main () {
   // launch the blinker background thread
   chThdCreateStatic(waBlinkTh, sizeof(waBlinkTh), NORMALPRIO, BlinkTh, NULL);
 
-  /* Configure message object 1 to receive all 11-bit messages 0x400-0x4FF */
+  /* Configure message object 1 to receive all 11-bit messages */
   msg_obj.msgobj = 1;
-  msg_obj.mode_id = 0x400;
-  msg_obj.mask = 0x700;
+  msg_obj.mode_id = 0x0;
+  msg_obj.mask = 0x0;
   LPC_CCAN_API->config_rxmsgobj(&msg_obj);
 
   chThdSleepMilliseconds(1000);
@@ -106,26 +106,52 @@ int main () {
   for (int y = 0; ; ++y) {
     while (!received)
       chThdYield(); // wait until data available from receiver interrupt
-    int line = (y * 2) % 6;
+    
+    switch (rxMsg.mode_id) {
+      case 0x415: // change the receive address & mask
+        rxMsg.msgobj = 1;
+        rxMsg.mode_id = rxMsg.data[0] | (rxMsg.data[1] << 8) |
+                        (rxMsg.data[2] << 16) | (rxMsg.data[3] << 24);
+        rxMsg.mask = rxMsg.data[0] | (rxMsg.data[1] << 8) |
+                     (rxMsg.data[2] << 16) | (rxMsg.data[3] << 24);
+        LPC_CCAN_API->config_rxmsgobj(&rxMsg);
+        // display settings on line 7 of the display
+        chsnprintf(buf, sizeof buf, "%8x%8x", rxMsg.mode_id, rxMsg.mask);
+        sendStrXY(buf, 7, 0);
+        break;
+        
+      case 0x416: // set display message, part 1
+      case 0x417: // set display message, part 2
+        for (int i = 0; i < 8; ++i)
+          buf[i] = rxMsg.data[i];
+        buf[8] = 0;
+        sendStrXY(buf, 7, rxMsg.mode_id == 0x415 ? 0 : 8);
+        break;
+        
+      default: { // show message in top six lines of display, cycling
+        int line = (y * 2) % 6;
 
-    palTogglePad(GPIO0, GPIO0_LEDB);    // blue LED on, very briefly
-    sendStrXY(" ", (line + 4) % 6, 0);  // clear the previous cursor
-    palTogglePad(GPIO0, GPIO0_LEDB);    // blue LED off again
+        palTogglePad(GPIO0, GPIO0_LEDB);    // blue LED on, very briefly
+        sendStrXY(" ", (line + 4) % 6, 0);  // clear the previous cursor
+        palTogglePad(GPIO0, GPIO0_LEDB);    // blue LED off again
     
-    // display first line
-    chsnprintf(buf, sizeof buf, ">%03x            ", msg_recv.mode_id);
-    sendStrXY(buf, line, 0);
+        // display first line
+        chsnprintf(buf, sizeof buf, ">%03x            ", rxMsg.mode_id);
+        sendStrXY(buf, line, 0);
     
-    // display second line
-    chsnprintf(buf, sizeof buf, "%02X%02X%02x%02x%02X%02X%02x%02x",
-      msg_recv.data[0], msg_recv.data[1], msg_recv.data[2], msg_recv.data[3],
-      msg_recv.data[4], msg_recv.data[5], msg_recv.data[6], msg_recv.data[7]);
-    for (int i = msg_obj.dlc; i < 8; ++i)
-      buf[2*i] = buf[2*i+1] = ' '; // clear display past the received bytes
-    sendStrXY(buf, line + 1, 0);
+        // display second line
+        chsnprintf(buf, sizeof buf, "%02X%02X%02x%02x%02X%02X%02x%02x",
+          rxMsg.data[0], rxMsg.data[1], rxMsg.data[2], rxMsg.data[3],
+          rxMsg.data[4], rxMsg.data[5], rxMsg.data[6], rxMsg.data[7]);
+        for (int i = msg_obj.dlc; i < 8; ++i)
+          buf[2*i] = buf[2*i+1] = ' '; // clear display past the received bytes
+        sendStrXY(buf, line + 1, 0);
+        break;
+      }
+    }    
     
-    // release message buffer for re-use - since display updating is slow, some
-    // received messages may have been dropped during the above update cycle
+    // release message buffer for re-use - since display updating is slow,
+    // some received messages may have been dropped during the update cycle
     received = false;
   }
 
