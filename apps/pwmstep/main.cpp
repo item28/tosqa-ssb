@@ -1,4 +1,4 @@
-// ssb11 stepper - test stepper motor pulsing
+// ssb11 pwm step - test stepper motor pulsing with PWM
 // jcw, 2014-04-10
 
 #include "ch.h"

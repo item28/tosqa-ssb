@@ -5,30 +5,13 @@
 #include "hal.h"
 
 // keep a LED blinking at 2 Hz in the background
-static WORKING_AREA(waBlinkTh, 128);
+static WORKING_AREA(waBlinkTh, 64);
 static msg_t BlinkTh(void*) {
   for (;;) {
     chThdSleepMilliseconds(250);
     palTogglePad(GPIO1, GPIO1_LED1);
   }
   return 0;
-}
-
-static void motorInit() {
-  // set the static stepper I/O pins to a default state
-  palSetPad(GPIO3, GPIO3_MOTOR_SLEEP);    // active low, disabled
-  palSetPad(GPIO1, GPIO1_MOTOR_MS3);      // 16-th microstepping
-  palSetPad(GPIO1, GPIO1_MOTOR_MS2);      // 16-th microstepping
-  palSetPad(GPIO3, GPIO3_MOTOR_MS1);      // 16-th microstepping
-  palSetPad(GPIO1, GPIO1_MOTOR_RESET);    // active low, disabled
-
-  LPC_IOCON->R_PIO0_11 = 0xD3;  // MOTOR_STEP, CT32B0_MAT3
-  LPC_SYSCON->SYSAHBCLKCTRL |= 1<<9; // enable clock for CT32B0
-  LPC_TMR32B0->PR = 48; // prescaler -> 1 MHz
-  LPC_TMR32B0->MCR |= (1<<9) | (1<<10); // MR3I + MR3R, p.366
-  LPC_TMR32B0->PWMC = 1<<3; // pwm enable, p.372
-
-  nvicEnableVector(TIMER_32_0_IRQn, LPC11xx_PWM_CT32B0_IRQ_PRIORITY);
 }
 
 static void motorTimer(bool on) {
@@ -53,8 +36,26 @@ static void motorCurrent(bool on) {
     palSetPad(GPIO3, GPIO3_MOTOR_EN);     // active low
 }
 
-#define CSLOW  (5000 << 8)  // 5 ms, i.e. start from 3.75 rpm
-#define CFAST  (100 << 8)   // 100 µs, 16 µsteps, 320 ms/rev = 187.5 rpm
+static void motorInit() {
+  // set the static stepper I/O pins to a default state
+  palSetPad(GPIO3, GPIO3_MOTOR_SLEEP);    // active low, disabled
+  palSetPad(GPIO1, GPIO1_MOTOR_MS3);      // 16-th microstepping
+  palSetPad(GPIO1, GPIO1_MOTOR_MS2);      // 16-th microstepping
+  palSetPad(GPIO3, GPIO3_MOTOR_MS1);      // 16-th microstepping
+  palSetPad(GPIO1, GPIO1_MOTOR_RESET);    // active low, disabled
+  motorCurrent(false);
+
+  LPC_IOCON->R_PIO0_11 = 0xD3;  // MOTOR_STEP, CT32B0_MAT3
+  LPC_SYSCON->SYSAHBCLKCTRL |= 1<<9; // enable clock for CT32B0
+  LPC_TMR32B0->PR = 48; // prescaler -> 1 MHz
+  LPC_TMR32B0->MCR |= (1<<9) | (1<<10); // MR3I + MR3R, p.366
+  LPC_TMR32B0->PWMC = 1<<3; // pwm enable, p.372
+
+  nvicEnableVector(TIMER_32_0_IRQn, LPC11xx_PWM_CT32B0_IRQ_PRIORITY);
+}
+
+#define CSLOW  (5000 << 8)  // 5 ms, 200 Hz, i.e. start from 3.75 rpm
+#define CFAST  (100 << 8)   // 100 µs, 10 KHz, 16 µsteps, 320 ms/rev = 187.5 rpm
 
 static enum {
   rampIdle, rampUp, rampMax, rampDown, rampLast
@@ -65,12 +66,14 @@ static int pos, inc, rate, stepNo, stepDown, move, midPt, denom;
 
 extern "C" void Vector88 (); // CT32B0
 CH_IRQ_HANDLER(Vector88)  {
-  CH_IRQ_PROLOGUE();
+  // CH_IRQ_PROLOGUE();
 
-  uint16_t sr  = LPC_TMR32B0->IR;
-  LPC_TMR32B0->IR = sr;
+  uint16_t sr = LPC_TMR32B0->IR;
+  LPC_TMR32B0->IR = sr; // clear all interrupts for this timer
 
   switch (state) {
+    case rampIdle:
+      break; // can't happen
     case rampUp:
       if (stepNo == midPt) {
         state = rampDown;
@@ -106,15 +109,15 @@ CH_IRQ_HANDLER(Vector88)  {
       motorTimer(false);
       running = false;
       break;
-    case rampIdle:
-      return;
   }
 
-  pos += inc;
-  ++stepNo;
-  motorRate(rate);
+  if (state != rampIdle) {
+    pos += inc;
+    ++stepNo;
+    motorRate(rate);
+  }
 
-  CH_IRQ_EPILOGUE();
+  // CH_IRQ_EPILOGUE();
 }
 
 static void moveTo(int posNew) {
