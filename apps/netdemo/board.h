@@ -48,8 +48,10 @@
 /*
  * GPIO 0 initial setup.
  */
-#define VAL_GPIO0DIR            PAL_PORT_BIT(GPIO0_LED2_RED)
-#define VAL_GPIO0DATA           0x00000000
+#define VAL_GPIO0DIR            PAL_PORT_BIT(GPIO0_LED2_RED) | \
+                                PAL_PORT_BIT(GPIO0_MMC_PWR) | \
+                                PAL_PORT_BIT(GPIO0_MMC_SSEL)
+#define VAL_GPIO0DATA           PAL_PORT_BIT(GPIO0_MMC_SSEL)
 
 /*
  * GPIO 1 initial setup.
@@ -100,6 +102,10 @@
 // #define GPIO0_LED3_EXT          28  /* Connect LED to board. */
 
 #define GPIO2_PIN12_TO_GND      12
+                                  
+#define GPIO0_MMC_PWR           18
+#define GPIO0_MMC_CD            19
+#define GPIO0_MMC_SSEL          6
 
 #if !defined(_FROM_ASM_)
 #ifdef __cplusplus
