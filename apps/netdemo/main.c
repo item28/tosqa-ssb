@@ -343,7 +343,7 @@ static msg_t can_tx(void * p) {
       ;
     int sample = ((LPC_ADC->GDR >> 4) & 0xFFF) - 0x800; // signed
     
-    uint8_t cmd = 0x04; // enable
+    uint8_t cmd = 0x14; // enable w/ half-step microstepping
     if (sample < 0) {
       cmd ^= 0x02; // direction
       sample = -sample;
