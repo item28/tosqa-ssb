@@ -137,7 +137,7 @@ static SPIConfig hs_spicfg = {
   NULL,
   GPIO0,
   GPIO0_MMC_SSEL,
-  CR0_DSS8BIT | CR0_FRFSPI | CR0_CLOCKRATE(0),
+  CR0_DSS8BIT | CR0_FRFSPI | CR0_CLOCKRATE(2),
   2
 };
 
@@ -146,7 +146,7 @@ static SPIConfig ls_spicfg = {
   NULL,
   GPIO0,
   GPIO0_MMC_SSEL,
-  CR0_DSS8BIT | CR0_FRFSPI | CR0_CLOCKRATE(0),
+  CR0_DSS8BIT | CR0_FRFSPI | CR0_CLOCKRATE(2),
   254
 };
 
@@ -457,7 +457,7 @@ int main(void) {
   chThdCreateStatic(can_tx_wa, sizeof(can_tx_wa), NORMALPRIO, Thread1, NULL);
 
   /*
-   * Initializes the MMC driver to work with SPI2.
+   * Initializes the MMC driver to work with SSP1.
    */
   mmcObjectInit(&MMCD1);
   mmcStart(&MMCD1, &mmccfg);
@@ -479,7 +479,7 @@ int main(void) {
   chThdCreateStatic(wa_http_server, sizeof(wa_http_server), NORMALPRIO + 1,
                     http_server, NULL);
 
-  chprintf(chp1, "\r\n[satmon]\r\n");
+  chprintf(chp1, "\r\n[netdemo]\r\n");
 
   static const ShellCommand commands[] = {
     // {"pwrdown", cmd_pwrdown},

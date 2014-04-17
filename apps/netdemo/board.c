@@ -100,4 +100,7 @@ void boardInit(void) {
   LPC_PINCON->PINMODE0 |= (2UL << 10) | (2UL << 8);     /* Disable pull-up on TD1 and RD1 pins.*/
 #endif
 
+  /* SSP1 */
+  LPC_PINCON->PINSEL0  |= (2UL << 14) | (2UL << 16) | (2UL << 18);     /* Set CAN2 TD2 P0.5 and RD2 P0.4 pins. */
+  LPC_PINCON->PINMODE0 |= (2UL << 14) | (2UL << 16) | (2UL << 18);     /* Disable pull-up on TD1 and RD1 pins.*/
 }
