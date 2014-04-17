@@ -51,7 +51,8 @@
 #define VAL_GPIO0DIR            PAL_PORT_BIT(GPIO0_LED2_RED) | \
                                 PAL_PORT_BIT(GPIO0_MMC_PWR) | \
                                 PAL_PORT_BIT(GPIO0_MMC_SSEL)
-#define VAL_GPIO0DATA           PAL_PORT_BIT(GPIO0_MMC_SSEL)
+#define VAL_GPIO0DATA           PAL_PORT_BIT(GPIO0_MMC_PWR) | \
+                                PAL_PORT_BIT(GPIO0_MMC_SSEL)
 
 /*
  * GPIO 1 initial setup.

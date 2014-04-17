@@ -374,6 +374,7 @@ static void InsertHandler(eventid_t id) {
   FRESULT err;
 
   (void)id;
+  palClearPad(GPIO0, GPIO0_MMC_PWR);
   // buzzPlayWait(1000, MS2ST(100));
   // buzzPlayWait(2000, MS2ST(100));
   chprintf(chp1, "MMC: inserted\r\n");
@@ -409,6 +410,7 @@ static void RemoveHandler(eventid_t id) {
   fs_ready = FALSE;
   // buzzPlayWait(2000, MS2ST(100));
   // buzzPlayWait(1000, MS2ST(100));
+  palSetPad(GPIO0, GPIO0_MMC_PWR);
 }
 
 /*
