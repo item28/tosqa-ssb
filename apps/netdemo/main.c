@@ -376,25 +376,25 @@ static void InsertHandler(eventid_t id) {
   (void)id;
   // buzzPlayWait(1000, MS2ST(100));
   // buzzPlayWait(2000, MS2ST(100));
-  chprintf((BaseSequentialStream *)&SD1, "MMC: inserted\r\n");
+  chprintf(chp1, "MMC: inserted\r\n");
   /*
    * On insertion MMC initialization and FS mount.
    */
-  chprintf((BaseSequentialStream *)&SD1, "MMC: initialization ");
+  chprintf(chp1, "MMC: initialization ");
   if (mmcConnect(&MMCD1)) {
-    chprintf((BaseSequentialStream *)&SD1, "failed\r\n");
+    chprintf(chp1, "failed\r\n");
     return;
   }
-  chprintf((BaseSequentialStream *)&SD1, "ok\r\n");
-  chprintf((BaseSequentialStream *)&SD1, "FS: mount ");
+  chprintf(chp1, "ok\r\n");
+  chprintf(chp1, "FS: mount ");
   err = f_mount(0, &MMC_FS);
   if (err != FR_OK) {
-    chprintf((BaseSequentialStream *)&SD1, "failed\r\n");
+    chprintf(chp1, "failed\r\n");
     mmcDisconnect(&MMCD1);
     return;
   }
   fs_ready = TRUE;
-  chprintf((BaseSequentialStream *)&SD1, "ok\r\n");
+  chprintf(chp1, "ok\r\n");
   // buzzPlay(440, MS2ST(200));
 }
 
@@ -404,7 +404,7 @@ static void InsertHandler(eventid_t id) {
 static void RemoveHandler(eventid_t id) {
 
   (void)id;
-  chprintf((BaseSequentialStream *)&SD1, "MMC: removed\r\n");
+  chprintf(chp1, "MMC: removed\r\n");
   mmcDisconnect(&MMCD1);
   fs_ready = FALSE;
   // buzzPlayWait(2000, MS2ST(100));
