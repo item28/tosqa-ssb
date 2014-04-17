@@ -45,10 +45,10 @@
 /*
  * GPT driver system settings.
  */
-#define LPC17xx_GPT_USE_TIM0                TRUE
-#define LPC17xx_GPT_USE_TIM1                TRUE
-#define LPC17xx_GPT_USE_TIM2                TRUE
-#define LPC17xx_GPT_USE_TIM3                TRUE
+#define LPC17xx_GPT_USE_TIM0                FALSE
+#define LPC17xx_GPT_USE_TIM1                FALSE
+#define LPC17xx_GPT_USE_TIM2                FALSE
+#define LPC17xx_GPT_USE_TIM3                FALSE
 #define LPC17xx_GPT_TIM0_IRQ_PRIORITY       2
 #define LPC17xx_GPT_TIM1_IRQ_PRIORITY       6
 #define LPC17xx_GPT_TIM2_IRQ_PRIORITY       2
@@ -90,8 +90,8 @@
 /*
  * RTC driver system settings.
  */
-#define LPC17xx_RTC_IS_CALENDAR             TRUE
-#define LPC17xx_RTC_USE_ALARM               TRUE
+#define LPC17xx_RTC_IS_CALENDAR             FALSE
+#define LPC17xx_RTC_USE_ALARM               FALSE
 #define LPC17xx_RTC_IRQ_PRIORITY            3
 
 /*

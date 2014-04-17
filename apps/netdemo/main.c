@@ -104,13 +104,11 @@ static void tmr_init(void *p) {
 
 /* Board-related functions related to the MMC_SPI driver.*/
 bool_t mmc_lld_is_card_inserted(MMCDriver *mmcp) {
-
   (void)mmcp;
   return !palReadPad(GPIO0, GPIO0_MMC_CD);
 }
 
 bool_t mmc_lld_is_write_protected(MMCDriver *mmcp) {
-
   (void)mmcp;
   return 0; // palReadPad(IOPORT2, PB_WP1);
 }
