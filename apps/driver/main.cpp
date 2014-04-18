@@ -15,7 +15,7 @@
 typedef struct {
     uint16_t minPos;        // do not move below this value
     uint16_t maxPos;        // do not move above this value
-    uint16_t posMultiplier; // 8.8 multiplier from pos to real step counts
+    uint16_t posFactor;     // 8.8 multiplier from pos to real step counts
     uint16_t configuration; // microstepping, other I/O settings, etc
 } MotionParams;
 
