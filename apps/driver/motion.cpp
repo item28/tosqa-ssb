@@ -1,4 +1,5 @@
 // motion code, this is the low-level timer/pwm stepping stuff
+// TODO: velocity is ignored, only linear stepping for now
 
 #define MHZ 48  // timer rate, same as system clock w/o prescaler
 
@@ -16,16 +17,12 @@ CH_FAST_IRQ_HANDLER(Vector88)  {
 }
 
 void motionInit () {
-    motion.params.maxPos = 65535;
-    motion.params.posFactor = 1 << 8;       // as 8.8 fraction, i.e. 1.0
-    
     // set the static stepper I/O pins to a default state
     palSetPad(GPIO3, GPIO3_MOTOR_SLEEP);    // active low, disabled
-    palSetPad(GPIO1, GPIO1_MOTOR_MS3);      // 16-th microstepping
-    palSetPad(GPIO1, GPIO1_MOTOR_MS2);      // 16-th microstepping
-    palSetPad(GPIO3, GPIO3_MOTOR_MS1);      // 16-th microstepping
     palSetPad(GPIO1, GPIO1_MOTOR_RESET);    // active low, disabled
     palSetPad(GPIO3, GPIO3_MOTOR_EN);       // active low, off
+    
+    motionParams(motion.params);            // initialise to sane values
 
     LPC_IOCON->R_PIO0_11 = 0xD3;            // MOTOR_STEP, CT32B0_MAT3
     LPC_SYSCON->SYSAHBCLKCTRL |= 1<<9;      // enable clock for CT32B0
@@ -44,35 +41,47 @@ static int currentPosition () {
 }
 
 // set the motion configuration parameters
-void motionParams (const MotionParams* p) {
-    motion.params = *p;
+void motionParams (const MotionParams& p) {
+    motion.params = p;
+
+    if (motion.params.posFactor == 0)
+        motion.params.posFactor = 1 << 8;
+    if (motion.params.maxPos <= motion.params.minPos) {
+        motion.params.minPos = -32768;
+        motion.params.maxPos = 32767;
+    }
+
+    // copy microstep configuration to the corresponding pins
+    palWritePad(GPIO3, GPIO3_MOTOR_MS1, (p.microStep >> 2) & 1);
+    palWritePad(GPIO1, GPIO1_MOTOR_MS2, (p.microStep >> 1) & 1);
+    palWritePad(GPIO1, GPIO1_MOTOR_MS3, (p.microStep >> 0) & 1);
 }
 
 // move to the given setpoint
-void motionTarget (Setpoint& s) {
+void motionTarget (const Setpoint& s) {
     LPC_TMR32B0->TCR = 0; // stop interrupts so stepsToGo won't change
     
     int pos = s.position;
+    if (s.relative)
+        pos += currentPosition();
+    
     if (pos < motion.params.minPos)
         pos = motion.params.minPos;
     else if (pos > motion.params.maxPos)
         pos = motion.params.maxPos;
     
-    int dist = pos - currentPosition();
-    motion.incOrDec = dist > 0 ? 1 : -1;
-    motion.stepsToGo = (dist * motion.incOrDec * motion.params.posFactor) >> 8;
+    int diff = pos - currentPosition();
+    motion.incOrDec = diff > 0 ? 1 : -1;
+    motion.stepsToGo = (diff * motion.incOrDec * motion.params.posFactor) >> 8;
     motion.targetPos = pos;
 
-    if (dist != 0) {
-        uint16_t duration = s.time - chTimeNow(); // number of msecs for move
-        uint32_t rate = (MHZ * 1000 * duration) / motion.stepsToGo; // linear
+    if (motion.stepsToGo > 0) {
+        uint32_t rate = (MHZ * 1000 * s.time) / motion.stepsToGo; // linear
         if (rate < MHZ * 10)
             rate = MHZ * 10;        // 10 µs, max 100 KHz
-        else if (rate > MHZ * 1000000)
-            rate = MHZ * 1000000;   // 1s, i.e. min 1 Hz
         LPC_TMR32B0->MR3 = rate;
     
-        palWritePad(GPIO1, GPIO1_MOTOR_DIR, dist > 0 ? 1 : 0);
+        palWritePad(GPIO1, GPIO1_MOTOR_DIR, diff > 0 ? 1 : 0);
         palClearPad(GPIO3, GPIO3_MOTOR_EN); // active low, on
         LPC_TMR32B0->TCR = 1;               // start timer
 
@@ -87,7 +96,7 @@ void motionTarget (Setpoint& s) {
 // stop all motion, regardless of what is currently happening
 void motionStop () {
     Setpoint next;
-    next.time = chTimeNow() + 1;            // stop as soon as possible
+    next.time = 1;                          // stop as soon as possible
     next.position = currentPosition();      // request to stop on current pos
     next.velocity = 0;                      // ends with stepper not moving
     motionTarget(next);

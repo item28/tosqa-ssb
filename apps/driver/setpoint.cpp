@@ -48,11 +48,11 @@ static void setpointInit () {
 }
 
 // add a next setpoint for the stepper to go to, will wait if queue is full
-static void setpointAdd (const Setpoint* s) {
+static void setpointAdd (const Setpoint& s) {
     for (int i = 0; i < SETPOINT_QUEUE_SIZE; ++i)
         if ((setpoint.inUse & (1 << i)) == 0) {
             setpoint.inUse |= 1 << i;
-            setpoint.setpoints[i] = *s;
+            setpoint.setpoints[i] = s;
             chMBPost(&setpoint.mailbox, i, TIME_INFINITE);
             return;
         }

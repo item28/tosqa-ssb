@@ -13,10 +13,11 @@
 
 // these stepper parameters need to be set up before use
 typedef struct {
-    uint16_t minPos;        // do not move below this value
-    uint16_t maxPos;        // do not move above this value
+    int16_t minPos;         // do not move below this value
+    int16_t maxPos;         // do not move above this value
     uint16_t posFactor;     // 8.8 multiplier from pos to real step counts
-    uint16_t configuration; // microstepping, other I/O settings, etc
+    uint16_t microStep :3;  // microstepping, other I/O settings, etc
+    uint16_t unused    :13; // microstepping, other I/O settings, etc
 } MotionParams;
 
 // a setpoint defines a time in the future with given position and velocity
@@ -25,17 +26,18 @@ typedef struct {
     uint16_t time;          // milliseconds, wraps around roughly once a minute
     int16_t  position;      // absolute target position, signed
     int16_t  velocity;      // maximum velocity, signed
-    uint16_t other;         // could be used for triggers, LEDs, etc
+    uint16_t relative  :1;  // position is relative to previous one
+    uint16_t unused    :15; // could be used for triggers, LEDs, etc
 } Setpoint;
 
 // defined in included files below
 static void canBusInit ();
 static void motionInit ();
-static void motionParams (const MotionParams* p);
-static void motionTarget (Setpoint& s);
+static void motionParams (const MotionParams& p);
+static void motionTarget (const Setpoint& s);
 static void motionStop ();
 static void setpointInit ();
-static void setpointAdd (const Setpoint* s);
+static void setpointAdd (const Setpoint& s);
 static void blinkerInit ();
 
 #include "blinker.cpp"
@@ -50,14 +52,19 @@ int main () {
     motionInit();
     setpointInit();
     blinkerInit();
-
-    Setpoint sp = { 0, 0, 1, 0 };
-    sp.time = chTimeNow() + 2000;
-    sp.position = 3200;
-    setpointAdd(&sp);
-    sp.time = chTimeNow() + 3000;
-    sp.position = 0;
-    setpointAdd(&sp);
+    
+    static Setpoint sp;
+    sp.time = 2000;
+    sp.position = 200;  // 10 ms/step
+    sp.velocity = 1;
+    setpointAdd(sp);
+    sp.time = 500;
+    sp.position = 100;  // 5 ms/step
+    setpointAdd(sp);
+    sp.time = 1000;
+    sp.position = -500; // 2 ms/step
+    sp.relative = 1;
+    setpointAdd(sp);
 
     for (;;) {
         // process each CAN bus message as it comes in via the mailbox
@@ -67,10 +74,10 @@ int main () {
                 const void* p = canBus.rxMessage.data;
                 switch (canBus.rxMessage.mode_id) {
                     case 0x420:
-                        motionParams((const MotionParams*) p);
+                        motionParams(*(const MotionParams*) p);
                         break;
                     case 0x421:
-                        setpointAdd((const Setpoint*) p);
+                        setpointAdd(*(const Setpoint*) p);
                         break;
                 }
             }
