@@ -60,16 +60,16 @@ int main () {
     setpointAdd(&sp);
 
     for (;;) {
-        // process each incoming CAN bus message as it comes in via the mailbox
+        // process each CAN bus message as it comes in via the mailbox
         msg_t rxMsg;
         if (chMBFetch(&canBus.rxPending, &rxMsg, TIME_INFINITE) == RDY_OK) {
             if (canBus.rxMessage.dlc == 8) {
                 const void* p = canBus.rxMessage.data;
                 switch (canBus.rxMessage.mode_id) {
-                    case 0x410:
+                    case 0x420:
                         motionParams((const MotionParams*) p);
                         break;
-                    case 0x411:
+                    case 0x421:
                         setpointAdd((const Setpoint*) p);
                         break;
                 }

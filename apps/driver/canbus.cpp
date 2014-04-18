@@ -69,10 +69,10 @@ void canBusInit () {
     LPC_CCAN_API->config_calb(&callbacks);
     NVIC_EnableIRQ(CAN_IRQn);
 
-    // Configure message object 1 to receive all 11-bit messages 0x410-0x413
+    // Configure message object 1 to receive all 11-bit messages 0x420-0x423
     CCAN_MSG_OBJ_T msg_obj;
     msg_obj.msgobj = 1;
-    msg_obj.mode_id = 0x410;
+    msg_obj.mode_id = 0x420;
     msg_obj.mask = 0x7FC;
     LPC_CCAN_API->config_rxmsgobj(&msg_obj);
 }

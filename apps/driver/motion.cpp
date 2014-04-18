@@ -1,10 +1,10 @@
 // motion code, this is the low-level timer/pwm stepping stuff
 
 static struct {
-    MotionParams params;
-    int          targetPos;
-    int          incOrDec;
-    uint32_t     stepsToGo;
+    MotionParams params;                    // motor limits
+    int          targetPos;                 // where the stepper needs to go
+    int          incOrDec;                  // +1 if forward, -1 if backward
+    uint32_t     stepsToGo;                 // drops to 0 when motion is done
 } motion;
 
 extern "C" void Vector88 (); // CT32B0
@@ -55,16 +55,16 @@ void motionTarget (Setpoint& s) {
         uint32_t rate = 1000 * duration / motion.stepsToGo; // linear motion
         if (rate < 100)
             rate = 100;     // 100 µs, max 10 KHz
-        if (rate > 1000000) // 1s, i.e. min 1 Hz
-            rate = 1000000;
+        if (rate > 1000000)
+            rate = 1000000; // 1s, i.e. min 1 Hz
         LPC_TMR32B0->MR3 = rate;
     
-        palWritePad(GPIO1, GPIO1_MOTOR_DIR, motion.incOrDec > 0 ? 1 : 0);
-        palClearPad(GPIO3, GPIO3_MOTOR_EN);     // active low, on
-        LPC_TMR32B0->TCR = 1;                   // start timer
+        palWritePad(GPIO1, GPIO1_MOTOR_DIR, distance > 0 ? 1 : 0);
+        palClearPad(GPIO3, GPIO3_MOTOR_EN); // active low, on
+        LPC_TMR32B0->TCR = 1;               // start timer
 
-        while (motion.stepsToGo > 0)            // move!
-            chThdYield();
+        while (motion.stepsToGo > 0)        // move!
+            chThdYield();                   // uses idle polling
     }
 
     if (s.velocity == 0)
@@ -75,7 +75,7 @@ void motionTarget (Setpoint& s) {
 void motionStop () {
     Setpoint next;
     next.time = chTimeNow() + 1;            // stop as soon as possible
-    next.position = motion.targetPos - motion.incOrDec * motion.stepsToGo;
+    next.position = currentPosition();      // request to stop on current pos
     next.velocity = 0;                      // ends with stepper not moving
     motionTarget(next);
 }
