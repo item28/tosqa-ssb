@@ -1,6 +1,10 @@
 # include these rules to sorta/kinda use the LPCLink 1 & 2 as JTAG programmers
 # requires an installed LPCXpresso IDE, paths below configured for Mac OSX
 
+# convenience target, to find out how large the compiled code is
+size: build/$(PROJECT).elf
+	arm-none-eabi-size build/$(PROJECT).elf
+	
 # paths and settings used for uploading
 LPCX = /Applications/lpcxpresso_7.1.1_125//lpcxpresso/bin
 LPCX_PKG ?= LPC11C24/301
