@@ -25,9 +25,10 @@ int main () {
     blinkerInit();
 
     for (;;) {
-        chBSemWait(&canBus.rxPending);
-        palTogglePad(GPIO1, GPIO1_OLI_LED1);
-        chBSemReset(&canBus.rxPending, 0);
+        msg_t rxMsg;
+        if (chMBFetch(&canBus.rxPending, &rxMsg, TIME_INFINITE) == RDY_OK) {
+            palTogglePad(GPIO1, GPIO1_OLI_LED1);
+        }
     }
 
     return 0;

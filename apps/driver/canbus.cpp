@@ -10,25 +10,23 @@
 
 // internal state
 static struct {
-    BinarySemaphore rxPending;
-    CCAN_MSG_OBJ_T  rxMessage;
-    int             rxOverruns;
-    int             errorCount;
+    Mailbox        rxPending;
+    msg_t          rxBuffer[1];
+    CCAN_MSG_OBJ_T rxMessage;
+    int            rxOverruns;
+    int            errorCount;
 } canBus;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
-    CCAN_MSG_OBJ_T msg_obj;
-    msg_obj.msgobj = msg_obj_num;
-    LPC_CCAN_API->can_receive(&msg_obj);
+    CCAN_MSG_OBJ_T msgObj;
+    msgObj.msgobj = msg_obj_num;
+    LPC_CCAN_API->can_receive(&msgObj);
     
-    // signal when a message is ready, or drop it if a previous one is pending
     chSysLockFromIsr();
-    if (chBSemGetStateI(&canBus.rxPending))
-        ++canBus.rxOverruns;
-    else {
-        canBus.rxMessage = msg_obj;
-        chBSemSignalI(&canBus.rxPending);
-    }
+    if (chMBPostI(&canBus.rxPending, 0) == RDY_OK)
+        canBus.rxMessage = msgObj;
+    else
+        ++canBus.rxOverruns; // rx packet lost, no room in message queue
     chSysUnlockFromIsr();
 }
 
@@ -58,7 +56,7 @@ CH_IRQ_HANDLER(Vector74)  {
 }
 
 void canBusInit () {
-    chBSemInit(&canBus.rxPending, 0);
+    chMBInit(&canBus.rxPending, canBus.rxBuffer, 1);
 
     LPC_SYSCON->SYSAHBCLKCTRL |= 1 << 17; // SYSCTL_CLOCK_CAN
 
@@ -70,4 +68,11 @@ void canBusInit () {
     LPC_CCAN_API->init_can(clkInitTable, true);
     LPC_CCAN_API->config_calb(&callbacks);
     NVIC_EnableIRQ(CAN_IRQn);
+
+    // Configure message object 1 to receive all 11-bit messages 0x410-0x413
+    CCAN_MSG_OBJ_T msg_obj;
+    msg_obj.msgobj = 1;
+    msg_obj.mode_id = 0x410;
+    msg_obj.mask = 0x7FC;
+    LPC_CCAN_API->config_rxmsgobj(&msg_obj);
 }
