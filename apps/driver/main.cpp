@@ -7,8 +7,8 @@
 
 // Olimex LPC-P11C24 board has green/yellow LEDs, but on different pins
 #if 1
-#define GPIO1_OLI_LED1    GPIO1_DIGIPOT_UD  // PIO1_11, green
-#define GPIO1_OLI_LED2    GPIO1_POWER_TERM  // PIO1_10, yellow
+    #define GPIO1_OLI_LED1    GPIO1_DIGIPOT_UD  // PIO1_11, green
+    #define GPIO1_OLI_LED2    GPIO1_POWER_TERM  // PIO1_10, yellow
 #endif
 
 // these stepper parameters need to be set up before use
@@ -52,10 +52,10 @@ int main () {
     blinkerInit();
 
     Setpoint sp = { 0, 0, 1, 0 };
-    sp.time = chTimeNow() + 1000;
-    sp.position = 3000;
-    setpointAdd(&sp);
     sp.time = chTimeNow() + 2000;
+    sp.position = 3200;
+    setpointAdd(&sp);
+    sp.time = chTimeNow() + 3000;
     sp.position = 0;
     setpointAdd(&sp);
 

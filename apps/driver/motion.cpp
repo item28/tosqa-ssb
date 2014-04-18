@@ -1,10 +1,10 @@
-// motion code, this is the low-level timer/pwm steppign stuff
+// motion code, this is the low-level timer/pwm stepping stuff
 
 static struct {
     MotionParams params;
     int          targetPos;
     int          incOrDec;
-    int          stepsToGo;
+    uint32_t     stepsToGo;
 } motion;
 
 extern "C" void Vector88 (); // CT32B0
@@ -31,14 +31,17 @@ void motionInit () {
     nvicEnableVector(TIMER_32_0_IRQn, LPC11xx_PWM_CT32B0_IRQ_PRIORITY);
 }
 
+// figure out the current position of the stepper motor
 static int currentPosition () {
     return motion.targetPos - motion.incOrDec * motion.stepsToGo;
 }
 
+// set the motion configuration parameters
 void motionParams (const MotionParams* p) {
     motion.params = *p;
 }
 
+// move to the given setpoint
 void motionTarget (Setpoint& s) {
     LPC_TMR32B0->TCR = 0; // stop interrupts so stepsToGo won't change
     
@@ -47,15 +50,22 @@ void motionTarget (Setpoint& s) {
     motion.stepsToGo = distance * motion.incOrDec;
     motion.targetPos = s.position;
 
-    int duration = s.time - chTimeNow();    // number of milliseconds for move
-    LPC_TMR32B0->MR3 = 1000 * motion.stepsToGo / duration; // linear motion
+    if (distance != 0) {
+        uint16_t duration = s.time - chTimeNow(); // number of msecs for move
+        uint32_t rate = 1000 * duration / motion.stepsToGo; // linear motion
+        if (rate < 100)
+            rate = 100;     // 100 µs, max 10 KHz
+        if (rate > 1000000) // 1s, i.e. min 1 Hz
+            rate = 1000000;
+        LPC_TMR32B0->MR3 = rate;
     
-    palWritePad(GPIO1, GPIO1_MOTOR_DIR, motion.incOrDec);
-    palClearPad(GPIO3, GPIO3_MOTOR_EN);     // active low, on
-    LPC_TMR32B0->TCR = 1;                   // start timer
+        palWritePad(GPIO1, GPIO1_MOTOR_DIR, motion.incOrDec > 0 ? 1 : 0);
+        palClearPad(GPIO3, GPIO3_MOTOR_EN);     // active low, on
+        LPC_TMR32B0->TCR = 1;                   // start timer
 
-    while (motion.stepsToGo > 0)            // move!
-        chThdYield();
+        while (motion.stepsToGo > 0)            // move!
+            chThdYield();
+    }
 
     if (s.velocity == 0)
         palSetPad(GPIO3, GPIO3_MOTOR_EN);   // active low, off

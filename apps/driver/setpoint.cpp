@@ -22,18 +22,20 @@ static msg_t stepperTh (void*) {
     for (;;) {
         msg_t spIndex;
         if (chMBFetch(&setpoint.mailbox, &spIndex, timeout) == RDY_OK) {
+            #ifdef GPIO1_OLI_LED1
+                palClearPad(GPIO1, GPIO1_OLI_LED1); // active low, on
+            #endif
             motionTarget(setpoint.setpoints[spIndex]);
             setpoint.inUse |= 1 << spIndex;
             timeout = TIME_IMMEDIATE;
         } else {
-            // there is no work, gently stop the stepper, and wait for next cmd
+            // there is no work, stop the stepper and wait for next cmd
             motionStop();
+            #ifdef GPIO1_OLI_LED1
+                palSetPad(GPIO1, GPIO1_OLI_LED1); // active low, off
+            #endif
             timeout = TIME_INFINITE;
         }
-#ifdef GPIO1_OLI_LED1
-        // turn LED1 on while there is work to do (active low)
-        palWritePad(GPIO1, GPIO1_OLI_LED1, timeout == TIME_INFINITE ? 1 : 0);
-#endif
     }
     return 0;
 }
