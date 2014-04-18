@@ -45,6 +45,29 @@ static void blinkerInit ();
 #include "motion.cpp"
 #include "setpoint.cpp"
 
+static void processIncomingRequest () {
+    if (canBus.rxMessage.dlc == 8) {
+        const void* p = canBus.rxMessage.data;
+        switch (canBus.rxMessage.mode_id) {
+            case 0x420:
+                motionParams(*(const MotionParams*) p);
+                break;
+            case 0x421:
+                setpointAdd(*(const Setpoint*) p);
+                break;
+        }
+    }
+}
+
+static void reportQueueAvail (int slots) {
+    CCAN_MSG_OBJ_T txMsg;
+    txMsg.msgobj = 2;
+    txMsg.mode_id = 0x720;
+    txMsg.dlc = 1;
+    txMsg.data[0] = slots;
+    LPC_CCAN_API->can_transmit(&txMsg);
+}
+
 int main () {
     halInit();
     chSysInit();
@@ -52,35 +75,38 @@ int main () {
     motionInit();
     setpointInit();
     blinkerInit();
-    
-    static Setpoint sp;
-    sp.time = 2000;
-    sp.position = 200;  // 10 ms/step
-    sp.velocity = 1;
-    setpointAdd(sp);
-    sp.time = 500;
-    sp.position = 100;  // 5 ms/step
-    setpointAdd(sp);
-    sp.time = 1000;
-    sp.position = -500; // 2 ms/step
-    sp.relative = 1;
-    setpointAdd(sp);
 
+    #if 1    
+        static Setpoint sp;
+        sp.time = 2000;
+        sp.position = 200;  // 10 ms/step
+        sp.velocity = 1;
+        setpointAdd(sp);
+        sp.time = 500;
+        sp.position = 100;  // 5 ms/step
+        setpointAdd(sp);
+        sp.time = 1000;
+        sp.position = -500; // 2 ms/step
+        sp.relative = 1;
+        setpointAdd(sp);
+    #endif
+    
+    bool sendSlotCount = true;
     for (;;) {
-        // process each CAN bus message as it comes in via the mailbox
         msg_t rxMsg;
-        if (chMBFetch(&canBus.rxPending, &rxMsg, TIME_INFINITE) == RDY_OK) {
-            if (canBus.rxMessage.dlc == 8) {
-                const void* p = canBus.rxMessage.data;
-                switch (canBus.rxMessage.mode_id) {
-                    case 0x420:
-                        motionParams(*(const MotionParams*) p);
-                        break;
-                    case 0x421:
-                        setpointAdd(*(const Setpoint*) p);
-                        break;
+        switch (chMBFetch(&canBus.rxPending, &rxMsg, 100)) {
+            case RDY_OK:
+                // process each CAN bus message as it comes in via the mailbox
+                processIncomingRequest();
+                sendSlotCount = true; // report at least once
+                break;
+            case RDY_TIMEOUT:
+                // report queue free after incoming msgs, until queue is empty
+                if (sendSlotCount) {
+                    reportQueueAvail(chMBGetFreeCountI(&setpoint.mailbox));
+                    sendSlotCount = chMBGetUsedCountI(&setpoint.mailbox) > 0;
                 }
-            }
+                break;
         }
     }
 
