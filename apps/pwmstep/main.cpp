@@ -38,7 +38,7 @@ int main () {
 
   LPC_IOCON->R_PIO0_11 = 0xD3;  // MOTOR_STEP, CT32B0_MAT3
   LPC_SYSCON->SYSAHBCLKCTRL |= 1<<9; // enable clock for CT32B0
-  LPC_TMR32B0->PR = 48; // prescaler -> 1 MHz
+  LPC_TMR32B0->PR = 47; // prescaler -> 1 MHz
   LPC_TMR32B0->MCR |= 1<<10; // MR3R p.366
   LPC_TMR32B0->MR3 = 2000/16; // reset at 2000 -> 500 Hz (200-stepper: 150 rpm)
   LPC_TMR32B0->PWMC = 1<<3; // pwm enable p.372

@@ -47,7 +47,7 @@ static void motorInit() {
 
   LPC_IOCON->R_PIO0_11 = 0xD3;  // MOTOR_STEP, CT32B0_MAT3
   LPC_SYSCON->SYSAHBCLKCTRL |= 1<<9; // enable clock for CT32B0
-  LPC_TMR32B0->PR = 48; // prescaler -> 1 MHz
+  LPC_TMR32B0->PR = 47; // prescaler -> 1 MHz
   LPC_TMR32B0->MCR |= (1<<9) | (1<<10); // MR3I + MR3R, p.366
   LPC_TMR32B0->PWMC = 1<<3; // pwm enable, p.372
 
