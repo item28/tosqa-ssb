@@ -6,17 +6,28 @@
 #include "hal.h"
 
 // Olimex LPC-P11C24 board has green/yellow LEDs, but on different pins
+#if 1
 #define GPIO1_OLI_LED1    GPIO1_DIGIPOT_UD  // PIO1_11, green
 #define GPIO1_OLI_LED2    GPIO1_POWER_TERM  // PIO1_10, yellow
+#endif
+
+// defined elsewhere
+static void blinkerInit ();     // blinker.cpp
+static void canBusInit ();      // canbus.cpp
+
+#include "blinker.cpp"
+#include "canbus.cpp"
 
 int main () {
     halInit();
     chSysInit();
+    canBusInit();
+    blinkerInit();
 
     for (;;) {
+        chBSemWait(&canBus.rxPending);
         palTogglePad(GPIO1, GPIO1_OLI_LED1);
-        palTogglePad(GPIO1, GPIO1_OLI_LED2);
-        chThdSleepMilliseconds(250);
+        chBSemReset(&canBus.rxPending, 0);
     }
 
     return 0;
