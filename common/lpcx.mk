@@ -3,7 +3,7 @@
 
 # convenience target, to find out how large the compiled code is
 size: build/$(PROJECT).elf
-	arm-none-eabi-size build/$(PROJECT).elf
+	@arm-none-eabi-size build/$(PROJECT).elf
 	
 # paths and settings used for uploading
 LPCX = /Applications/lpcxpresso_7.1.1_125//lpcxpresso/bin

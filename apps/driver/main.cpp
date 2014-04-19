@@ -1,7 +1,6 @@
 // ssb11 driver - command processor for motor stepping via the CAN bus
 // jcw, 2014-04-18
 
-
 #include "ch.h"
 #include "hal.h"
 
@@ -76,7 +75,7 @@ int main () {
     setpointInit();
     blinkerInit();
 
-    #if 1    
+    #if 1
         static Setpoint sp;
         sp.time = 2000;
         sp.position = 200;  // 10 ms/step
