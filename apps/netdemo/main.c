@@ -203,7 +203,7 @@ BaseSequentialStream* chp1 = (BaseSequentialStream*) &SD1;
 /*
  * Red LED blinker thread, times are in milliseconds.
  */
-static WORKING_AREA(waBlinker, 128);
+static WORKING_AREA(waBlinker, 64);
 static msg_t blinker (void *arg) {
   (void)arg;
   chRegSetThreadName("blinker");
@@ -311,8 +311,8 @@ static void cmd_tree(BaseSequentialStream *chp, int argc, char *argv[]) {
 static WORKING_AREA(can_tx_wa, 256);
 
 static msg_t can_tx(void * p) {
-  CANTxFrame txmsg_can1;
   (void)p;
+  CANTxFrame txmsg_can1;
   chRegSetThreadName("transmitter");
   txmsg_can1.IDE = CAN_IDE_STD;
   txmsg_can1.EID = 0x412;
@@ -360,8 +360,85 @@ static msg_t can_tx(void * p) {
       chThdSleepMilliseconds(1000-sample);
       txmsg_can1.DLC = 0;
     }
-    canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, MS2ST(1000));
+    canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, 100);
   }
+  return 0;
+}
+
+#if LPC17xx_CAN_USE_FILTER
+static const CANFilterExt cfe_id_table[1] = {
+  CANFilterExtEntry(0, 0x1F123400)
+};
+
+static const CANFilterConfig canfcfg = {
+  0,
+  NULL,
+  0,
+  NULL,
+  0,
+  NULL,
+  0,
+  cfe_id_table,
+  1,
+  NULL,
+  0
+};
+#endif
+
+/*
+ * CAN receiver thread.
+ */
+static WORKING_AREA(can_rx_wa, 256);
+
+static uint8_t nodeMap[20][8];
+int nextNode = 1;
+
+static msg_t can_rx(void * p) {
+  (void)p;
+  EventListener el;
+  CANRxFrame rxmsg;
+
+  CANTxFrame txmsg;
+  txmsg.IDE = CAN_IDE_EXT;
+  txmsg.RTR = CAN_RTR_DATA;
+  txmsg.DLC = 8;
+
+  (void)p;
+  chRegSetThreadName("receiver");
+  chEvtRegister(&CAND1.rxfull_event, &el, 0);
+  while(!chThdShouldTerminate()) {
+    while (canReceive(&CAND1, CAN_ANY_MAILBOX, &rxmsg, 100) == RDY_OK) {
+      /* Process message.*/
+      if (rxmsg.DLC == 8) {
+        int i = 0;
+        while (i < nextNode)
+          if (memcmp(nodeMap[i], rxmsg.data8, 8) == 0)
+            break;
+          else
+            ++i;
+        if (i >= nextNode)
+          memcpy(nodeMap[nextNode++], rxmsg.data8, 8);
+        chprintf(chp1, "CAN announce %08x %08x -> %d\r\n",
+                        rxmsg.data32[0], rxmsg.data32[1], i);
+        txmsg.EID = 0x1F123400 + i;
+        memcpy(txmsg.data8, rxmsg.data8, 8);
+        canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg, 100);
+      } else if (rxmsg.DLC == 3 && rxmsg.data8[0] == 1) {
+        chprintf(chp1, "CAN boot %02x #%d\r\n", rxmsg.data8[1], rxmsg.data8[2]);
+        if (rxmsg.data8[2] < 8) {
+          txmsg.EID = 0x1F123400 + rxmsg.data8[1];
+          int i;
+          for (i = 0; i < 512; ++i) {
+            chprintf(chp1, ".");
+            canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg, 100);
+            chThdSleepMilliseconds(1);
+          }
+          chprintf(chp1, " ok\r\n");
+        }
+      }
+    }
+  }
+  chEvtUnregister(&CAND1.rxfull_event, &el);
   return 0;
 }
 
@@ -455,6 +532,15 @@ int main(void) {
    * Creates the CAN transmit thread.
    */
   chThdCreateStatic(can_tx_wa, sizeof(can_tx_wa), NORMALPRIO, can_tx, NULL);
+
+#if LPC17xx_CAN_USE_FILTER
+  canSetFilter(&canfcfg);
+#endif
+
+  /*
+   * Creates the CAN receive thread.
+   */
+  chThdCreateStatic(can_rx_wa, sizeof(can_rx_wa), NORMALPRIO, can_rx, NULL);
 
   /*
    * Initializes the MMC driver to work with SSP1.

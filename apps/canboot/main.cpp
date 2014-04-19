@@ -13,8 +13,8 @@
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
-// #define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
-#define BLINK() palTogglePad(GPIO0, 7) // LPCxpresso 11C24
+#define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
+// #define BLINK() palTogglePad(GPIO0, 7) // LPCxpresso 11C24
 
 CCAN_MSG_OBJ_T rxMsg;
 uint32_t       myUid [4];
@@ -61,7 +61,9 @@ static void canBusInit () {
 static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     static uint32_t results[5];
     uint32_t params [5] = { type, a, b, c, d };
+    chSysDisable();
     iap_entry((unsigned*) params, (unsigned*) results);
+    chSysEnable();
     return results[0] == 0 ? results + 1 : 0;
 }
 
@@ -70,7 +72,7 @@ static bool bootCheck () {
     CCAN_MSG_OBJ_T msgObj;
     
     // send own uid to a fixed CAN bus address to request a unique 1..255 id
-    msgObj.msgobj  = 2;
+    msgObj.msgobj  = 10;
     msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
     // msgObj.mode_id = 0x432;
     msgObj.mask    = 0x0;
@@ -97,6 +99,10 @@ static bool bootCheck () {
                 msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400 | shortId;
                 msgObj.mask = 0x1FFFFFFF;
                 LPC_CCAN_API->config_rxmsgobj(&msgObj);
+                msgObj.msgobj = 2;
+                LPC_CCAN_API->config_rxmsgobj(&msgObj);
+                msgObj.msgobj = 3;
+                LPC_CCAN_API->config_rxmsgobj(&msgObj);
 
                 return true;
             }
@@ -109,7 +115,7 @@ static bool bootCheck () {
 static bool download (uint8_t page) {
     // send out a request to receive a 4 KB page
     CCAN_MSG_OBJ_T msgObj;    
-    msgObj.msgobj  = 3;
+    msgObj.msgobj  = 11;
     msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
     // msgObj.mode_id = 0x321;
     msgObj.mask    = 0x0;
@@ -126,15 +132,15 @@ static bool download (uint8_t page) {
         if (rxMsg.msgobj) {
             rxMsg.msgobj = 0;
             if (rxMsg.dlc == 8) {
-                BLINK();
+                // BLINK();
                 memcpy(p, rxMsg.data, 8);
                 p += 8;
                 if (p >= codeBuf + sizeof codeBuf)
                     return true; // page reception completed
-                i = 0; // restart timeout
             }
-        }
-        chThdSleepMilliseconds(1);
+            i = 0; // restart timeout
+        } else
+            chThdSleepMilliseconds(1);
     }
     // download ends when messages are not received within 100 ms of each other
     return false;
@@ -159,6 +165,7 @@ int main () {
         for (uint8_t page = 1; download(page); ++page) {
             BLINK();
             saveToFlash(page);
+            BLINK();
         }
     }
     
