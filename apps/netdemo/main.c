@@ -203,8 +203,8 @@ BaseSequentialStream* chp1 = (BaseSequentialStream*) &SD1;
 /*
  * Red LED blinker thread, times are in milliseconds.
  */
-static WORKING_AREA(waThread1, 128);
-static msg_t Thread1 (void *arg) {
+static WORKING_AREA(waBlinker, 128);
+static msg_t blinker (void *arg) {
   (void)arg;
   chRegSetThreadName("blinker");
   while (TRUE) {
@@ -449,12 +449,12 @@ int main(void) {
   /*
    * Creates the blinker thread.
    */
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, can_tx, NULL);
+  chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
 
   /*
    * Creates the CAN transmit thread.
    */
-  chThdCreateStatic(can_tx_wa, sizeof(can_tx_wa), NORMALPRIO, Thread1, NULL);
+  chThdCreateStatic(can_tx_wa, sizeof(can_tx_wa), NORMALPRIO, can_tx, NULL);
 
   /*
    * Initializes the MMC driver to work with SSP1.
