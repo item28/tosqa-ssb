@@ -3,6 +3,7 @@
 
 #include "ch.h"
 #include "hal.h"
+#include <string.h>
 
 // Olimex LPC-P11C24 board has green/yellow LEDs, but on different pins
 #if 1
@@ -47,11 +48,11 @@ static void blinkerInit ();
 static void processIncomingRequest () {
     if (canBus.rxMessage.dlc == 8) {
         const void* p = canBus.rxMessage.data;
-        switch (canBus.rxMessage.mode_id) {
-            case 0x420:
+        switch (canBus.rxMessage.mode_id & 0x07) {
+            case 0:
                 motionParams(*(const MotionParams*) p);
                 break;
-            case 0x421:
+            case 1:
                 setpointAdd(*(const Setpoint*) p);
                 break;
         }
@@ -60,7 +61,7 @@ static void processIncomingRequest () {
 
 static void reportQueueAvail (int slots) {
     CCAN_MSG_OBJ_T txMsg;
-    txMsg.msgobj = 2;
+    txMsg.msgobj = 10;
     txMsg.mode_id = 0x720;
     txMsg.dlc = 1;
     txMsg.data[0] = slots;

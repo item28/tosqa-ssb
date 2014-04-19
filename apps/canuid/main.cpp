@@ -84,7 +84,7 @@ int main () {
   
   for (;;) {
     msg_obj.msgobj  = 1;
-    msg_obj.mode_id = 0x414;
+    msg_obj.mode_id = 0x434;
     msg_obj.mask    = 0x0;
     msg_obj.dlc     = 8;
     msg_obj.data[0] = uid[0];
@@ -100,7 +100,7 @@ int main () {
     chThdSleepMilliseconds(500);
 
     msg_obj.msgobj  = 2;
-    msg_obj.mode_id = 0x415;
+    msg_obj.mode_id = 0x435;
     msg_obj.mask    = 0x0;
     msg_obj.dlc     = 8;
     msg_obj.data[0] = uid[2];
