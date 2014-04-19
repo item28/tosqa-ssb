@@ -87,7 +87,8 @@ void motionTarget (const Setpoint& s) {
 
         while (motion.stepsToGo > 0)        // move!
             chThdYield();                   // uses idle polling
-    }
+    } else if (s.time > 0)
+        chThdSleepMilliseconds(s.time);     // dwell
 
     if (s.velocity == 0)
         palSetPad(GPIO3, GPIO3_MOTOR_EN);   // active low, off

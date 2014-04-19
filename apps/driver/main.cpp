@@ -32,6 +32,7 @@ typedef struct {
 
 // defined in included files below
 static void canBusInit ();
+static void canBusStart (int addr);
 static void motionInit ();
 static void motionParams (const MotionParams& p);
 static void motionTarget (const Setpoint& s);
@@ -75,6 +76,8 @@ int main () {
     motionInit();
     setpointInit();
     blinkerInit();
+    
+    canBusStart(0x420); // listen to address range 0x420..7
 
     #if 1
         static Setpoint sp;
