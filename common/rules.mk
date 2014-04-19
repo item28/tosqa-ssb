@@ -60,7 +60,7 @@ include $(CHIBIOS)/os/ports/GCC/ARMCMx/LPC11xx/port.mk
 include $(CHIBIOS)/os/kernel/kernel.mk
 
 # Define linker script file here
-LDSCRIPT= $(TOSQA_COMMON)/LPC11C24.ld
+LDSCRIPT ?= $(TOSQA_COMMON)/LPC11C24.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.

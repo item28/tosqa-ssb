@@ -13,6 +13,9 @@
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
+// #define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
+#define BLINK() palTogglePad(GPIO0, 7) // LPCxpresso 11C24
+
 CCAN_MSG_OBJ_T rxMsg;
 uint32_t       myUid [4];
 uint8_t        codeBuf [4096];
@@ -123,7 +126,7 @@ static bool download (uint8_t page) {
         if (rxMsg.msgobj) {
             rxMsg.msgobj = 0;
             if (rxMsg.dlc == 8) {
-                palTogglePad(GPIO2, 10); // LPC11C24-DK-A
+                BLINK();
                 memcpy(p, rxMsg.data, 8);
                 p += 8;
                 if (p >= codeBuf + sizeof codeBuf)
@@ -154,14 +157,14 @@ int main () {
     
     if (bootCheck() > 0) {
         for (uint8_t page = 1; download(page); ++page) {
-            palTogglePad(GPIO2, 10); // LPC11C24-DK-A
+            BLINK();
             saveToFlash(page);
         }
     }
     
     for (;;) {
-        palTogglePad(GPIO2, 10); // LPC11C24-DK-A
-        chThdSleepMilliseconds(500);
+        BLINK();
+        chThdSleepMilliseconds(1000);
     }
 
     return 0;
