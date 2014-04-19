@@ -5,14 +5,6 @@
 #include "hal.h"
 #include <string.h>
 
-// Olimex LPC-P11C24 board has green/yellow LEDs, but on different pins
-#if 1
-    #define GPIO1_OLI_LED1    GPIO1_DIGIPOT_UD  // PIO1_11, green
-    #define GPIO1_OLI_LED2    GPIO1_POWER_TERM  // PIO1_10, yellow
-#endif
-
-#include "../driver/blinker.cpp"
-
 // ROM-based CAN bus drivers
 #define IAP_ENTRY_LOCATION        0X1FFF1FF1
 #define LPC_ROM_API_BASE_LOC      0x1FFF1FF8
@@ -24,30 +16,15 @@
 CCAN_MSG_OBJ_T rxMsg;
 uint32_t       myUid [4];
 uint8_t        codeBuf [4096];
+uint8_t        shortId;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
     rxMsg.msgobj = msg_obj_num;
     LPC_CCAN_API->can_receive(&rxMsg);
 }
 
-static void CAN_txCallback (uint8_t /* msg_obj_num */) {}
-
-static void CAN_errorCallback (uint32_t error_info) {
-    // if (error_info & 0x0002)
-    //     palTogglePad(GPIO1, GPIO1_OLI_LED1);
-    if (error_info & 0x0004)
-        palTogglePad(GPIO1, GPIO1_OLI_LED1);
-}
-
 static CCAN_CALLBACKS_T callbacks = {
-    CAN_rxCallback,
-    CAN_txCallback,
-    CAN_errorCallback,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
+    CAN_rxCallback, 0, 0, 0, 0, 0, 0, 0,
 };
 
 extern "C" void Vector74 ();
@@ -73,38 +50,23 @@ static void canBusInit () {
     NVIC_EnableIRQ(CAN_IRQn);
 }
 
-static const uint32_t* iapCall(int type, int a, int b, int c, int d) {
+#define PREP_WRITE      50
+#define COPY_TO_FLASH   51
+#define ERASE_SECT      52
+#define READ_UID        58
+
+static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     static uint32_t results[5];
     uint32_t params [5] = { type, a, b, c, d };
-    iap_entry(params, results);
+    iap_entry((unsigned*) params, (unsigned*) results);
     return results[0] == 0 ? results + 1 : 0;
 }
 
-// see http://www.lpcware.com/content/forum/read-serial-number
-static void readUid (uint32_t* uid) {
-  unsigned param_table[5];
-  unsigned result_table[5];
-  param_table[0] = 58; // IAP command
-  iap_entry(param_table, result_table);
-  if (result_table[0] == 0) {
-    uid[0] = result_table[1];
-    uid[1] = result_table[2];
-    uid[2] = result_table[3];
-    uid[3] = result_table[4];
-  } else {
-    uid[0] = uid[1] = uid[2] = uid[3] = 0;
-  }
-}
-
 // send first 8 bytes of this chip's UID out to 0x1F123400
-static uint8_t bootCheck () {
-    // configure message object 1 to receive 29-bit messages to 0x1F123400..FF
-    CCAN_MSG_OBJ_T msgObj;    
-    msgObj.msgobj = 1;
-    msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
-    msgObj.mask = 0x1FFFFF00;
-    LPC_CCAN_API->config_rxmsgobj(&msgObj);
-
+static bool bootCheck () {
+    CCAN_MSG_OBJ_T msgObj;
+    
+    // send own uid to a fixed CAN bus address to request a unique 1..255 id
     msgObj.msgobj  = 2;
     msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
     // msgObj.mode_id = 0x432;
@@ -113,23 +75,32 @@ static uint8_t bootCheck () {
     memcpy(msgObj.data, myUid, 8);
     LPC_CCAN_API->can_transmit(&msgObj);
 
-    // wait up to 250 ms to get a reply
-    for (int i = 0; i < 250; ++i) {
-        if (rxMsg.msgobj == 1 && memcmp(rxMsg.data, myUid, 8) == 0) {
+    // configure message object 1 to receive 29-bit messages to 0x1F123400..FF
+    msgObj.msgobj = 1;
+    msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
+    msgObj.mask = 0x1FFFFF00;
+    LPC_CCAN_API->config_rxmsgobj(&msgObj);
+
+    // wait up to 100 ms to get a reply
+    rxMsg.msgobj = 0;
+    for (int i = 0; i < 100; ++i) {
+        if (rxMsg.msgobj) {
             rxMsg.msgobj = 0;
-            uint8_t myAddr = rxMsg.mode_id; // use lower 8 bits of address
-            // got reply, only listen to the specified address from now on
-            if (myAddr > 0) {
+            if (memcmp(rxMsg.data, myUid, 8) == 0) {
+                shortId = rxMsg.mode_id; // use lower 8 bits of address as id
+
+                // only listen to the assigned address from now on
                 msgObj.msgobj = 1;
-                msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400 | myAddr;
+                msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400 | shortId;
                 msgObj.mask = 0x1FFFFFFF;
                 LPC_CCAN_API->config_rxmsgobj(&msgObj);
-                return myAddr;
+
+                return true;
             }
         }
         chThdSleepMilliseconds(1);
     }
-    return 0;
+    return false;
 }
 
 static bool download (uint8_t page) {
@@ -139,51 +110,57 @@ static bool download (uint8_t page) {
     msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
     // msgObj.mode_id = 0x321;
     msgObj.mask    = 0x0;
-    msgObj.dlc     = 2;
-    msgObj.data[0] = 1; // boot request for a 4 KB page download
-    msgObj.data[1] = page;
+    msgObj.dlc     = 3;
+    msgObj.data[0] = 1;         // boot request for a 4 KB page download
+    msgObj.data[1] = shortId;   // own id
+    msgObj.data[2] = page;      // page index (1..7 for LPC11C24)
     LPC_CCAN_API->can_transmit(&msgObj);
     
-    // wait entire page to come in, as 8-byte messages
+    // wait for entire page to come in, as 8-byte messages
     rxMsg.msgobj = 0;
     uint8_t *p = codeBuf;
-    for (int i = 0; i < 250; ++i) {
-        if (rxMsg.msgobj > 0 && rxMsg.dlc == 8) {
+    for (int i = 0; i < 100; ++i) {
+        if (rxMsg.msgobj) {
             rxMsg.msgobj = 0;
-            // palTogglePad(GPIO1, GPIO1_OLI_LED1); // toggle on each receive
-            memcpy(p, rxMsg.data, 8);
-            p += 8;
-            if (p >= codeBuf + sizeof codeBuf)
-                return true; // page reception ok
-            i = 0; // reset timeout
+            if (rxMsg.dlc == 8) {
+                palTogglePad(GPIO2, 10); // LPC11C24-DK-A
+                memcpy(p, rxMsg.data, 8);
+                p += 8;
+                if (p >= codeBuf + sizeof codeBuf)
+                    return true; // page reception completed
+                i = 0; // restart timeout
+            }
         }
         chThdSleepMilliseconds(1);
     }
-    // download ends when messages are not received within 250 ms of each other
+    // download ends when messages are not received within 100 ms of each other
     return false;
+}
+
+static void saveToFlash (uint8_t page) {
+    iapCall(PREP_WRITE, page, page, 0, 0);
+    iapCall(ERASE_SECT, page, page, 0, 0);
+    iapCall(PREP_WRITE, page, page, 0, 0);
+    iapCall(COPY_TO_FLASH, page * sizeof codeBuf,
+            (uint32_t) codeBuf, sizeof codeBuf, 48000);
 }
 
 int main () {
     halInit();
     chSysInit();
     canBusInit();
-    blinkerInit();
 
-    readUid(myUid);
-    
-    chThdSleepMilliseconds(1000);
+    memcpy(myUid, iapCall(READ_UID, 0, 0, 0, 0), sizeof myUid);
     
     if (bootCheck() > 0) {
         for (uint8_t page = 1; download(page); ++page) {
-            #ifdef GPIO1_OLI_LED2
-                palTogglePad(GPIO1, GPIO1_OLI_LED2);
-            #else
-                palTogglePad(GPIO1, GPIO1_LED1);
-            #endif
+            palTogglePad(GPIO2, 10); // LPC11C24-DK-A
+            saveToFlash(page);
         }
     }
     
     for (;;) {
+        palTogglePad(GPIO2, 10); // LPC11C24-DK-A
         chThdSleepMilliseconds(500);
     }
 
