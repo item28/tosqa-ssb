@@ -49,14 +49,12 @@ static void canBusInit (void) {
     LPC_SYSCON->SYSAHBCLKCTRL |= 1 << 17; // SYSCTL_CLOCK_CAN
 
     static uint32_t clkInitTable[2] = { // see common/canRate.c
-        0x00000000UL,                   // CANCLKDIV, running at 48 MHz
-        // 0x000076C5UL                    // CAN_BTR, produces 500 Kbps
+        0x00000000UL,                   // CANCLKDIV, running at 12 MHz
         0x000054C1UL                    // CAN_BTR, produces 500 Kbps
     };
 
     LPC_CCAN_API->init_can(clkInitTable, 0);
     LPC_CCAN_API->config_calb(&callbacks);
-    NVIC_EnableIRQ(CAN_IRQn);
 }
 
 #define PREP_WRITE      50
@@ -160,12 +158,14 @@ static void saveToFlash (uint8_t page) {
     iapCall(ERASE_SECT, page, page, 0, 0);
     iapCall(PREP_WRITE, page, page, 0, 0);
     iapCall(COPY_TO_FLASH, page * sizeof codeBuf,
-            (uint32_t) codeBuf, sizeof codeBuf, 48000);
+            (uint32_t) codeBuf, sizeof codeBuf, 12000);
 }
 
 int main (void) {
+    // no clock setup, running on IRC @ 12 MHz
     // __disable_irq();
-    LPC_GPIO2->DIR |= (1 << 10);
+    
+    LPC_GPIO2->DIR |= 1<<10;
     blinkRate = 1000;
 
     canBusInit();
@@ -210,39 +210,6 @@ void SVCallVector(void) __attribute__ (( naked ));
 void DebugMonitorVector(void) __attribute__ (( naked ));
 void PendSVVector(void) __attribute__ (( naked ));
 void SysTickVector(void) __attribute__ (( naked ));
-
-void Vector40(void) __attribute__ (( naked ));
-void Vector44(void) __attribute__ (( naked ));
-void Vector48(void) __attribute__ (( naked ));
-void Vector4C(void) __attribute__ (( naked ));
-void Vector50(void) __attribute__ (( naked ));
-void Vector54(void) __attribute__ (( naked ));
-void Vector58(void) __attribute__ (( naked ));
-void Vector5C(void) __attribute__ (( naked ));
-void Vector60(void) __attribute__ (( naked ));
-void Vector64(void) __attribute__ (( naked ));
-void Vector68(void) __attribute__ (( naked ));
-void Vector6C(void) __attribute__ (( naked ));
-void Vector70(void) __attribute__ (( naked ));
-void Vector74(void) __attribute__ (( naked ));
-void Vector78(void) __attribute__ (( naked ));
-void Vector7C(void) __attribute__ (( naked ));
-void Vector80(void) __attribute__ (( naked ));
-void Vector84(void) __attribute__ (( naked ));
-void Vector88(void) __attribute__ (( naked ));
-void Vector8C(void) __attribute__ (( naked ));
-void Vector90(void) __attribute__ (( naked ));
-void Vector94(void) __attribute__ (( naked ));
-void Vector98(void) __attribute__ (( naked ));
-void Vector9C(void) __attribute__ (( naked ));
-void VectorA0(void) __attribute__ (( naked ));
-void VectorA4(void) __attribute__ (( naked ));
-void VectorA8(void) __attribute__ (( naked ));
-void VectorAC(void) __attribute__ (( naked ));
-void VectorB0(void) __attribute__ (( naked ));
-void VectorB4(void) __attribute__ (( naked ));
-void VectorB8(void) __attribute__ (( naked ));
-void VectorBC(void) __attribute__ (( naked ));
 
 void NMIVector (void) {
 	asm volatile("ldr r0, =0x1008");
@@ -297,6 +264,68 @@ void SysTickVector (void) {
 	asm volatile("ldr r0, [r0]");
 	asm volatile("mov pc, r0");
 }
+
+void Vector20(void) __attribute__ (( naked ));
+void Vector24(void) __attribute__ (( naked ));
+void Vector28(void) __attribute__ (( naked ));
+void Vector34(void) __attribute__ (( naked ));
+
+void Vector20 (void) {
+	asm volatile("ldr r0, =0x1020");
+	asm volatile("ldr r0, [r0]");
+	asm volatile("mov pc, r0");
+}
+
+void Vector24 (void) {
+	asm volatile("ldr r0, =0x1024");
+	asm volatile("ldr r0, [r0]");
+	asm volatile("mov pc, r0");
+}
+
+void Vector28 (void) {
+	asm volatile("ldr r0, =0x1028");
+	asm volatile("ldr r0, [r0]");
+	asm volatile("mov pc, r0");
+}
+
+void Vector34 (void) {
+	asm volatile("ldr r0, =0x1034");
+	asm volatile("ldr r0, [r0]");
+	asm volatile("mov pc, r0");
+}
+
+void Vector40(void) __attribute__ (( naked ));
+void Vector44(void) __attribute__ (( naked ));
+void Vector48(void) __attribute__ (( naked ));
+void Vector4C(void) __attribute__ (( naked ));
+void Vector50(void) __attribute__ (( naked ));
+void Vector54(void) __attribute__ (( naked ));
+void Vector58(void) __attribute__ (( naked ));
+void Vector5C(void) __attribute__ (( naked ));
+void Vector60(void) __attribute__ (( naked ));
+void Vector64(void) __attribute__ (( naked ));
+void Vector68(void) __attribute__ (( naked ));
+void Vector6C(void) __attribute__ (( naked ));
+void Vector70(void) __attribute__ (( naked ));
+void Vector74(void) __attribute__ (( naked ));
+void Vector78(void) __attribute__ (( naked ));
+void Vector7C(void) __attribute__ (( naked ));
+void Vector80(void) __attribute__ (( naked ));
+void Vector84(void) __attribute__ (( naked ));
+void Vector88(void) __attribute__ (( naked ));
+void Vector8C(void) __attribute__ (( naked ));
+void Vector90(void) __attribute__ (( naked ));
+void Vector94(void) __attribute__ (( naked ));
+void Vector98(void) __attribute__ (( naked ));
+void Vector9C(void) __attribute__ (( naked ));
+void VectorA0(void) __attribute__ (( naked ));
+void VectorA4(void) __attribute__ (( naked ));
+void VectorA8(void) __attribute__ (( naked ));
+void VectorAC(void) __attribute__ (( naked ));
+void VectorB0(void) __attribute__ (( naked ));
+void VectorB4(void) __attribute__ (( naked ));
+void VectorB8(void) __attribute__ (( naked ));
+void VectorBC(void) __attribute__ (( naked ));
 
 void Vector40 (void) {
 	asm volatile("ldr r0, =0x1040");

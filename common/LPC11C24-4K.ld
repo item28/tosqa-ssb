@@ -26,7 +26,7 @@ __process_stack_size__  = 0x0200;
 
 MEMORY
 {
-    flash : org = 0x00000000+4k, len = 32k-4k /* for secondady boot loader */
+    flash : org = 0x00000000+4k, len = 32k-4k /* for secondary boot loader */
     ram : org = 0x100000C0, len = 8k-0xC0 /* see 17.4.1 in UM10398, p.320 */
 }
 
