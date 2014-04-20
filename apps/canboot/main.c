@@ -1,7 +1,7 @@
 // bootstrap loader via the CAN bus, using Tosqa conventions
 // jcw, 2014-04-19
 
-#include "hal.h"
+#include "LPC11xx.h"
 #include <string.h>
 
 // ROM-based CAN bus drivers
@@ -9,10 +9,13 @@
 #define LPC_ROM_API_BASE_LOC      0x1FFF1FF8
 #define LPC_ROM_API               (*(LPC_ROM_API_T**) LPC_ROM_API_BASE_LOC)
 
+#define INLINE inline
+
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
-#define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
+#define BLINK() (LPC_GPIO2->DATA ^= 1<<10) // LPC11C24-DK-A
+// #define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
 // #define BLINK() palTogglePad(GPIO0, 7) // LPCxpresso 11C24
 // #define BLINK()
 
@@ -29,13 +32,13 @@ CCAN_MSG_OBJ_T rxMsg;
 uint32_t       myUid [4];
 uint8_t        codeBuf [4096] __attribute__((aligned(4)));
 uint8_t        shortId;
-volatile bool  ready;
+volatile int   ready;
 int            blinkRate = 1000;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
     rxMsg.msgobj = msg_obj_num;
     LPC_CCAN_API->can_receive(&rxMsg);
-    ready = true;
+    ready = 1;
 }
 
 static CCAN_CALLBACKS_T callbacks = {
@@ -54,7 +57,7 @@ static void canBusInit (void) {
         0x000076C5UL                    // CAN_BTR, produces 500 Kbps
     };
 
-    LPC_CCAN_API->init_can(clkInitTable, true);
+    LPC_CCAN_API->init_can(clkInitTable, 1);
     LPC_CCAN_API->config_calb(&callbacks);
     NVIC_EnableIRQ(CAN_IRQn);
 }
@@ -76,7 +79,7 @@ static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c
 }
 
 // send first 8 bytes of this chip's UID out to 0x1F123400
-static bool bootCheck (void) {
+static int bootCheck (void) {
     CCAN_MSG_OBJ_T msgObj;
     
     // send own uid to a fixed CAN bus address to request a unique 1..255 id
@@ -99,7 +102,7 @@ static bool bootCheck (void) {
     int i;
     for (i = 0; i < 1000000; ++i) {
         if (ready) {
-            ready = false;
+            ready = 0;
             if (memcmp(rxMsg.data, myUid, 8) == 0) {
                 shortId = rxMsg.mode_id; // use lower 8 bits of address as id
 
@@ -113,15 +116,15 @@ static bool bootCheck (void) {
                 msgObj.msgobj = 3;
                 LPC_CCAN_API->config_rxmsgobj(&msgObj);
 
-                return true;
+                return 1;
             }
         }
         // DELAY(1);
     }
-    return false;
+    return 0;
 }
 
-static bool download (uint8_t page) {
+static int download (uint8_t page) {
     // send out a request to receive a 4 KB page
     CCAN_MSG_OBJ_T msgObj;    
     msgObj.msgobj  = 11;
@@ -137,29 +140,22 @@ static bool download (uint8_t page) {
     // wait for entire page to come in, as 8-byte messages
     rxMsg.msgobj = 0;
     uint8_t *p = codeBuf;
-    // int i = 0;
     int timer;
     for (timer = 0; timer < 2500000; ++timer) {
         if (ready) {
-            ready = false;
+            ready = 0;
             if (rxMsg.dlc == 8) {
                 // BLINK();
                 memcpy(p, rxMsg.data, 8);
-                // int expect[] = { i, ~i };
-                // if (memcmp(rxMsg.data, expect, 8) != 0) {
-                //     blinkRate = 100;
-                //     break;
-                // }
-                // ++i;
                 p += 8;
                 if (p >= codeBuf + sizeof codeBuf)
-                    return true; // page reception completed
+                    return 1; // page reception completed
             }
             timer = 0; // reset the timeout timer
         }
     }
     // download ends when messages are not received within 100 ms of each other
-    return false;
+    return 0;
 }
 
 static void saveToFlash (uint8_t page) {
@@ -170,12 +166,7 @@ static void saveToFlash (uint8_t page) {
             (uint32_t) codeBuf, sizeof codeBuf, 48000);
 }
 
-// void boot_jump (uint32_t address) {
-//     asm volatile("ldr r0, [r0]");
-//     asm volatile("mov pc, r0");
-// }
-
-// extern "C" void SysTickVector () __attribute__((naked));
+// void SysTickVector () __attribute__((naked));
 // void SysTickVector (void) {
 //     asm volatile("ldr r0, =0x103C");
 //     asm volatile("ldr r0, [r0]");
@@ -200,16 +191,14 @@ int main (void) {
     }
     
     if (page > 1) {
-        // ST_CSR = 0; // stop the systick timer
-        // SCB_VTOR = 0x1000;
-
-    	asm volatile("ldr r0, =0x1000");
-    	asm volatile("ldr r0, [r0]");
-    	asm volatile("mov sp, r0");
-
-    	asm volatile("ldr r0, =0x1004");
-    	asm volatile("ldr r0, [r0]");
-    	asm volatile("mov pc, r0");
+        // set stack pointer
+        asm volatile("ldr r0, =0x1000");
+        asm volatile("ldr r0, [r0]");
+        asm volatile("mov sp, r0");
+        // jump to start address
+        asm volatile("ldr r0, =0x1004");
+        asm volatile("ldr r0, [r0]");
+        asm volatile("mov pc, r0");
     }
     
     for (;;) {
