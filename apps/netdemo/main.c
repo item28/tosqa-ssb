@@ -14,6 +14,8 @@
     limitations under the License.
 */
 
+#include <string.h>
+
 #include "ch.h"
 #include "hal.h"
 #include "test.h"
@@ -23,7 +25,7 @@
 #include "web/web.h"
 #include "ff.h"
 #include "evtimer.h"
-#include <string.h>
+#include "data.h"
 
 /*===========================================================================*/
 /* Card insertion monitor.                                                   */
@@ -360,7 +362,7 @@ static msg_t can_tx(void * p) {
       chThdSleepMilliseconds(1000-sample);
       txmsg_can1.DLC = 0;
     }
-    canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg_can1, 100);
+    canTransmit(&CAND1, 1, &txmsg_can1, 100);
   }
   return 0;
 }
@@ -422,19 +424,25 @@ static msg_t can_rx(void * p) {
                         rxmsg.data32[0], rxmsg.data32[1], i);
         txmsg.EID = 0x1F123400 + i;
         memcpy(txmsg.data8, rxmsg.data8, 8);
-        canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg, 100);
+        canTransmit(&CAND1, 1, &txmsg, 100);
+        // chThdSleepMilliseconds(1);
       } else if (rxmsg.DLC == 3 && rxmsg.data8[0] == 1) {
-        chprintf(chp1, "CAN boot %02x #%d\r\n", rxmsg.data8[1], rxmsg.data8[2]);
-        if (rxmsg.data8[2] < 8) {
-          txmsg.EID = 0x1F123400 + rxmsg.data8[1];
+        uint8_t dest = rxmsg.data8[1], page = rxmsg.data8[2];
+        chprintf(chp1, "CAN boot %02x #%d ", dest, page);
+        const uint8_t* p = bootData + 4096 * (page - 1);
+        if (dest > 0 && bootData <= p && p < bootData + sizeof bootData) {
+          txmsg.EID = 0x1F123400 + dest;
           int i;
-          for (i = 0; i < 512; ++i) {
-            chprintf(chp1, ".");
-            canTransmit(&CAND1, CAN_ANY_MAILBOX, &txmsg, 100);
-            chThdSleepMilliseconds(1);
+          for (i = 0; i < 4096; i += 8) {
+            if (i >= 4000)
+              chprintf(chp1, ".");
+            memcpy(txmsg.data8, p + i, 8);
+            canTransmit(&CAND1, 1, &txmsg, 100); // one mailbox, send in-order!
+            // chThdSleepMilliseconds(1);
           }
-          chprintf(chp1, " ok\r\n");
+          chprintf(chp1, " ok");
         }
+        chprintf(chp1, "\r\n");
       }
     }
   }

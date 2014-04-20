@@ -1,7 +1,6 @@
 // bootstrap loader via the CAN bus, using Tosqa conventions
 // jcw, 2014-04-19
 
-#include "ch.h"
 #include "hal.h"
 #include <string.h>
 
@@ -15,15 +14,28 @@
 
 #define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
 // #define BLINK() palTogglePad(GPIO0, 7) // LPCxpresso 11C24
+// #define BLINK()
+
+#define DELAY(ms) delay(ms)
+
+static void delay (int ms) {
+    volatile int i;
+    while (--ms >= 0)
+        for (i = 0; i < 3000; ++i)
+            ;
+}
 
 CCAN_MSG_OBJ_T rxMsg;
 uint32_t       myUid [4];
-uint8_t        codeBuf [4096];
+uint8_t        codeBuf [4096] __attribute__((aligned(4)));
 uint8_t        shortId;
+volatile bool  ready;
+int            blinkRate = 1000;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
     rxMsg.msgobj = msg_obj_num;
     LPC_CCAN_API->can_receive(&rxMsg);
+    ready = true;
 }
 
 static CCAN_CALLBACKS_T callbacks = {
@@ -31,13 +43,8 @@ static CCAN_CALLBACKS_T callbacks = {
 };
 
 extern "C" void Vector74 ();
-// CH_FAST_IRQ_HANDLER(Vector74)  {
-//     LPC_CCAN_API->isr();
-// }
-CH_IRQ_HANDLER(Vector74)  {
-    CH_IRQ_PROLOGUE();
+void Vector74 () {
     LPC_CCAN_API->isr();
-    CH_IRQ_EPILOGUE();
 }
 
 static void canBusInit () {
@@ -61,9 +68,11 @@ static void canBusInit () {
 static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     static uint32_t results[5];
     uint32_t params [5] = { type, a, b, c, d };
-    chSysDisable();
+    __disable_irq();
     iap_entry((unsigned*) params, (unsigned*) results);
-    chSysEnable();
+    __enable_irq();
+    if (results[0] != 0)
+        blinkRate = 100;
     return results[0] == 0 ? results + 1 : 0;
 }
 
@@ -88,9 +97,9 @@ static bool bootCheck () {
 
     // wait up to 100 ms to get a reply
     rxMsg.msgobj = 0;
-    for (int i = 0; i < 100; ++i) {
-        if (rxMsg.msgobj) {
-            rxMsg.msgobj = 0;
+    for (int i = 0; i < 1000000; ++i) {
+        if (ready) {
+            ready = false;
             if (memcmp(rxMsg.data, myUid, 8) == 0) {
                 shortId = rxMsg.mode_id; // use lower 8 bits of address as id
 
@@ -107,7 +116,7 @@ static bool bootCheck () {
                 return true;
             }
         }
-        chThdSleepMilliseconds(1);
+        // DELAY(1);
     }
     return false;
 }
@@ -128,19 +137,25 @@ static bool download (uint8_t page) {
     // wait for entire page to come in, as 8-byte messages
     rxMsg.msgobj = 0;
     uint8_t *p = codeBuf;
-    for (int i = 0; i < 100; ++i) {
-        if (rxMsg.msgobj) {
-            rxMsg.msgobj = 0;
+    // int i = 0;
+    for (int timer = 0; timer < 2500000; ++timer) {
+        if (ready) {
+            ready = false;
             if (rxMsg.dlc == 8) {
                 // BLINK();
                 memcpy(p, rxMsg.data, 8);
+                // int expect[] = { i, ~i };
+                // if (memcmp(rxMsg.data, expect, 8) != 0) {
+                //     blinkRate = 100;
+                //     break;
+                // }
+                // ++i;
                 p += 8;
                 if (p >= codeBuf + sizeof codeBuf)
                     return true; // page reception completed
             }
-            i = 0; // restart timeout
-        } else
-            chThdSleepMilliseconds(1);
+            timer = 0; // reset the timeout timer
+        }
     }
     // download ends when messages are not received within 100 ms of each other
     return false;
@@ -155,23 +170,35 @@ static void saveToFlash (uint8_t page) {
 }
 
 int main () {
-    halInit();
-    chSysInit();
+    LPC_GPIO2->DIR |= (1 << 10);
+
     canBusInit();
 
     memcpy(myUid, iapCall(READ_UID, 0, 0, 0, 0), sizeof myUid);
     
-    if (bootCheck() > 0) {
-        for (uint8_t page = 1; download(page); ++page) {
-            BLINK();
-            saveToFlash(page);
-            BLINK();
-        }
+    while (!bootCheck())
+        DELAY(1000);
+
+    uint8_t page = 0;
+    while (download(++page)) {
+        BLINK();
+        saveToFlash(page);
+        BLINK();
+    }
+    
+    if (page > 1) {
+        // ST_CSR = 0; // stop the systick timer
+        SCB_VTOR = 0x1000;
+        // __asm("LDR SP, [R0]    ;Load new stack pointer address")
+        void (*fun)() = (void (*)()) ((uint32_t*) 0x1000)[1];
+        // DELAY(3000);
+        __disable_irq();
+        fun();
     }
     
     for (;;) {
         BLINK();
-        chThdSleepMilliseconds(1000);
+        DELAY(blinkRate);
     }
 
     return 0;
