@@ -33,7 +33,7 @@ uint32_t       myUid [4];
 uint8_t        codeBuf [4096] __attribute__((aligned(4)));
 uint8_t        shortId;
 volatile int   ready;
-int            blinkRate = 1000;
+int            blinkRate;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
     rxMsg.msgobj = msg_obj_num;
@@ -57,7 +57,7 @@ static void canBusInit (void) {
         0x000076C5UL                    // CAN_BTR, produces 500 Kbps
     };
 
-    LPC_CCAN_API->init_can(clkInitTable, 1);
+    LPC_CCAN_API->init_can(clkInitTable, 0);
     LPC_CCAN_API->config_calb(&callbacks);
     NVIC_EnableIRQ(CAN_IRQn);
 }
@@ -70,9 +70,7 @@ static void canBusInit (void) {
 static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     static uint32_t results[5];
     uint32_t params [5] = { type, a, b, c, d };
-    __disable_irq();
     iap_entry((unsigned*) params, (unsigned*) results);
-    __enable_irq();
     if (results[0] != 0)
         blinkRate = 100;
     return results[0] == 0 ? results + 1 : 0;
@@ -101,6 +99,7 @@ static int bootCheck (void) {
     rxMsg.msgobj = 0;
     int i;
     for (i = 0; i < 1000000; ++i) {
+        LPC_CCAN_API->isr();
         if (ready) {
             ready = 0;
             if (memcmp(rxMsg.data, myUid, 8) == 0) {
@@ -142,6 +141,7 @@ static int download (uint8_t page) {
     uint8_t *p = codeBuf;
     int timer;
     for (timer = 0; timer < 2500000; ++timer) {
+        LPC_CCAN_API->isr();
         if (ready) {
             ready = 0;
             if (rxMsg.dlc == 8) {
@@ -174,7 +174,9 @@ static void saveToFlash (uint8_t page) {
 // }
 
 int main (void) {
+    // __disable_irq();
     LPC_GPIO2->DIR |= (1 << 10);
+    blinkRate = 1000;
 
     canBusInit();
 
