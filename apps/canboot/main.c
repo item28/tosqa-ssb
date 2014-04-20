@@ -24,7 +24,7 @@
 static void delay (int ms) {
     volatile int i;
     while (--ms >= 0)
-        for (i = 0; i < 3000; ++i)
+        for (i = 0; i < 750; ++i)
             ;
 }
 
@@ -54,7 +54,8 @@ static void canBusInit (void) {
 
     static uint32_t clkInitTable[2] = { // see common/canRate.c
         0x00000000UL,                   // CANCLKDIV, running at 48 MHz
-        0x000076C5UL                    // CAN_BTR, produces 500 Kbps
+        // 0x000076C5UL                    // CAN_BTR, produces 500 Kbps
+        0x000054C1UL                    // CAN_BTR, produces 500 Kbps
     };
 
     LPC_CCAN_API->init_can(clkInitTable, 0);
@@ -98,7 +99,7 @@ static int bootCheck (void) {
     // wait up to 100 ms to get a reply
     rxMsg.msgobj = 0;
     int i;
-    for (i = 0; i < 1000000; ++i) {
+    for (i = 0; i < 100000; ++i) {
         LPC_CCAN_API->isr();
         if (ready) {
             ready = 0;
@@ -140,7 +141,7 @@ static int download (uint8_t page) {
     rxMsg.msgobj = 0;
     uint8_t *p = codeBuf;
     int timer;
-    for (timer = 0; timer < 2500000; ++timer) {
+    for (timer = 0; timer < 250000; ++timer) {
         LPC_CCAN_API->isr();
         if (ready) {
             ready = 0;
@@ -166,12 +167,12 @@ static void saveToFlash (uint8_t page) {
             (uint32_t) codeBuf, sizeof codeBuf, 48000);
 }
 
-// void SysTickVector () __attribute__((naked));
-// void SysTickVector (void) {
-//     asm volatile("ldr r0, =0x103C");
-//     asm volatile("ldr r0, [r0]");
-//     asm volatile("mov pc, r0");
-// }
+void SysTickVector () __attribute__((naked));
+void SysTickVector (void) {
+    asm volatile("ldr r0, =0x103C");
+    asm volatile("ldr r0, [r0]");
+    asm volatile("mov pc, r0");
+}
 
 int main (void) {
     // __disable_irq();
@@ -179,12 +180,12 @@ int main (void) {
     blinkRate = 1000;
 
     canBusInit();
-
+    
     memcpy(myUid, iapCall(READ_UID, 0, 0, 0, 0), sizeof myUid);
     
     while (!bootCheck())
         DELAY(1000);
-
+    
     uint8_t page = 0;
     while (download(++page)) {
         BLINK();
@@ -192,7 +193,7 @@ int main (void) {
         BLINK();
     }
     
-    if (page > 1) {
+    if (page > 10) {
         // set stack pointer
         asm volatile("ldr r0, =0x1000");
         asm volatile("ldr r0, [r0]");
