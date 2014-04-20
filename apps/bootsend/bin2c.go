@@ -13,7 +13,7 @@ import (
 	"os"
 )
 
-const filename = "../canuid/build/ssb.bin"
+const filename = "../canboot/build/min.bin"
 
 func main() {
 	data, err := ioutil.ReadFile(filename)
