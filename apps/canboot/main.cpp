@@ -169,6 +169,18 @@ static void saveToFlash (uint8_t page) {
             (uint32_t) codeBuf, sizeof codeBuf, 48000);
 }
 
+// void boot_jump (uint32_t address) {
+//     asm volatile("ldr r0, [r0]");
+//     asm volatile("mov pc, r0");
+// }
+
+// extern "C" void SysTickVector () __attribute__((naked));
+// void SysTickVector () {
+//     asm volatile("ldr r0, =0x103C");
+//     asm volatile("ldr r0, [r0]");
+//     asm volatile("mov pc, r0");
+// }
+
 int main () {
     LPC_GPIO2->DIR |= (1 << 10);
 
@@ -188,12 +200,15 @@ int main () {
     
     if (page > 1) {
         // ST_CSR = 0; // stop the systick timer
-        SCB_VTOR = 0x1000;
-        // __asm("LDR SP, [R0]    ;Load new stack pointer address")
-        void (*fun)() = (void (*)()) ((uint32_t*) 0x1000)[1];
-        // DELAY(3000);
-        __disable_irq();
-        fun();
+        // SCB_VTOR = 0x1000;
+
+    	asm volatile("ldr r0, =0x1000");
+    	asm volatile("ldr r0, [r0]");
+    	asm volatile("mov sp, r0");
+
+    	asm volatile("ldr r0, =0x1004");
+    	asm volatile("ldr r0, [r0]");
+    	asm volatile("mov pc, r0");
     }
     
     for (;;) {
