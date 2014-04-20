@@ -18,9 +18,9 @@ Brief description of the applications in this area:
 * **stepcan** - send out lots of stepper commands on the CAN bus
 * **stepper** - drive the SSB's stepper using software timers
 
-The main firmware applications in the above list are:
+The most important firmware applications in the above list are:
 
-The **bootsend** app includes a compiled copy of _canboot_, which is can send
+The **bootsend** app includes a compiled copy of _canboot_, which it can send
 to an LPC11C24 powered-up in native ROM-based CAN boot mode (PIO0_3 low). This
 NXP-defined protocol runs over CAN at 100 KHz and uses CANopen'ish commands.
 
@@ -35,4 +35,4 @@ _re-mapped_ to their corresponding vectors, i.e. also 4 KB higher than usual.
 The **driver** app is the actual code for the Single Stepper Board. It listens
 for commands coming in over the CAN bus, and drives the attached stepper motor.
 
-The "`net*`" and "`sat*`" apps are for use with Embedded Artists' AOAA board.
+The "`net*`" and "`sat*`" apps are for use with the Embedded Artists AOAA board.
