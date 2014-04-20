@@ -1,6 +1,6 @@
 TOSQA_COMMON = ../../common
 
-SRC_CPP = main.cpp
+SRC_C = main.c
 
 include $(TOSQA_COMMON)/rules.mk
 include $(TOSQA_COMMON)/lpcx.mk

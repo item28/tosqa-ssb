@@ -42,12 +42,11 @@ static CCAN_CALLBACKS_T callbacks = {
     CAN_rxCallback, 0, 0, 0, 0, 0, 0, 0,
 };
 
-extern "C" void Vector74 ();
-void Vector74 () {
+void Vector74 (void) {
     LPC_CCAN_API->isr();
 }
 
-static void canBusInit () {
+static void canBusInit (void) {
     LPC_SYSCON->SYSAHBCLKCTRL |= 1 << 17; // SYSCTL_CLOCK_CAN
 
     static uint32_t clkInitTable[2] = { // see common/canRate.c
@@ -77,7 +76,7 @@ static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c
 }
 
 // send first 8 bytes of this chip's UID out to 0x1F123400
-static bool bootCheck () {
+static bool bootCheck (void) {
     CCAN_MSG_OBJ_T msgObj;
     
     // send own uid to a fixed CAN bus address to request a unique 1..255 id
@@ -97,7 +96,8 @@ static bool bootCheck () {
 
     // wait up to 100 ms to get a reply
     rxMsg.msgobj = 0;
-    for (int i = 0; i < 1000000; ++i) {
+    int i;
+    for (i = 0; i < 1000000; ++i) {
         if (ready) {
             ready = false;
             if (memcmp(rxMsg.data, myUid, 8) == 0) {
@@ -138,7 +138,8 @@ static bool download (uint8_t page) {
     rxMsg.msgobj = 0;
     uint8_t *p = codeBuf;
     // int i = 0;
-    for (int timer = 0; timer < 2500000; ++timer) {
+    int timer;
+    for (timer = 0; timer < 2500000; ++timer) {
         if (ready) {
             ready = false;
             if (rxMsg.dlc == 8) {
@@ -175,13 +176,13 @@ static void saveToFlash (uint8_t page) {
 // }
 
 // extern "C" void SysTickVector () __attribute__((naked));
-// void SysTickVector () {
+// void SysTickVector (void) {
 //     asm volatile("ldr r0, =0x103C");
 //     asm volatile("ldr r0, [r0]");
 //     asm volatile("mov pc, r0");
 // }
 
-int main () {
+int main (void) {
     LPC_GPIO2->DIR |= (1 << 10);
 
     canBusInit();
