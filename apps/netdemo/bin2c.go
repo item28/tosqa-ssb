@@ -13,7 +13,7 @@ import (
 	"os"
 )
 
-const filename = "../driver/build/ssb.bin"
+const filename = "../minimal/build/min.bin"
 
 func main() {
 	data, err := ioutil.ReadFile(filename)

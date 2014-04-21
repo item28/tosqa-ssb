@@ -336,6 +336,7 @@ static msg_t can_tx(void * p) {
 
   uint8_t lastCmd = 0;
   while (!chThdShouldTerminate()) {
+    chThdSleepMilliseconds(10); // avoid looping without yielding at all
     // perform one ADC conversion
     LPC_ADC->CR &= ~AD0CR_START_MASK;
     LPC_ADC->CR |= AD0CR_START_NOW;
@@ -368,8 +369,9 @@ static msg_t can_tx(void * p) {
 }
 
 #if LPC17xx_CAN_USE_FILTER
-static const CANFilterExt cfe_id_table[1] = {
-  CANFilterExtEntry(0, 0x1F123400)
+static const CANFilterExt cfe_id_table[2] = {
+  CANFilterExtEntry(0, 0x1F123480),
+  CANFilterExtEntry(0, 0x1F1234FF)
 };
 
 static const CANFilterConfig canfcfg = {
@@ -380,10 +382,10 @@ static const CANFilterConfig canfcfg = {
   0,
   NULL,
   0,
-  cfe_id_table,
-  1,
   NULL,
-  0
+  0,
+  cfe_id_table,
+  2
 };
 #endif
 
@@ -397,7 +399,6 @@ int nextNode = 1;
 
 static msg_t can_rx(void * p) {
   (void)p;
-  EventListener el;
   CANRxFrame rxmsg;
 
   CANTxFrame txmsg;
@@ -407,7 +408,6 @@ static msg_t can_rx(void * p) {
 
   (void)p;
   chRegSetThreadName("receiver");
-  chEvtRegister(&CAND1.rxfull_event, &el, 0);
   while(!chThdShouldTerminate()) {
     while (canReceive(&CAND1, CAN_ANY_MAILBOX, &rxmsg, 100) == RDY_OK) {
       /* Process message.*/
@@ -426,27 +426,28 @@ static msg_t can_rx(void * p) {
         memcpy(txmsg.data8, rxmsg.data8, 8);
         canTransmit(&CAND1, 1, &txmsg, 100);
         // chThdSleepMilliseconds(1);
-      } else if (rxmsg.DLC == 3 && rxmsg.data8[0] == 1) {
-        uint8_t dest = rxmsg.data8[1], page = rxmsg.data8[2];
-        chprintf(chp1, "CAN boot %02x #%d ", dest, page);
-        const uint8_t* p = bootData + 4096 * (page - 1);
-        if (dest > 0 && bootData <= p && p < bootData + sizeof bootData) {
-          txmsg.EID = 0x1F123400 + dest;
-          int i;
-          for (i = 0; i < 4096; i += 8) {
-            if (i >= 4000)
-              chprintf(chp1, ".");
-            memcpy(txmsg.data8, p + i, 8);
-            canTransmit(&CAND1, 1, &txmsg, 100); // one mailbox, send in-order!
-            // chThdSleepMilliseconds(1);
+      } else if (rxmsg.DLC == 2) {
+        uint8_t dest = rxmsg.data8[0], page = rxmsg.data8[1];
+        chprintf(chp1, "CAN boot %08x: %02x #%d ", rxmsg.EID, dest, page);
+        if ((rxmsg.EID & 0x7F) == 1) { // it's an SSB board
+          const uint8_t* p = bootData + 4096 * (page - 1);
+          if (dest > 0 && bootData <= p && p < bootData + sizeof bootData) {
+            txmsg.EID = 0x1F123400 + dest;
+            int i;
+            for (i = 0; i < 4096; i += 8) {
+              if (i >= 4000)
+                chprintf(chp1, ".");
+              memcpy(txmsg.data8, p + i, 8);
+              canTransmit(&CAND1, 1, &txmsg, 100); // 1 mailbox, send in-order!
+              // chThdSleepMilliseconds(1);
+            }
+            chprintf(chp1, " ok");
           }
-          chprintf(chp1, " ok");
         }
         chprintf(chp1, "\r\n");
       }
     }
   }
-  chEvtUnregister(&CAND1.rxfull_event, &el);
   return 0;
 }
 

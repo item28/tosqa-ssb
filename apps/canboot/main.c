@@ -14,19 +14,12 @@
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
+#define BOOT_ADDR_BASE  (CAN_MSGOBJ_EXT | 0x1F123400)
+
 #define BLINK() (LPC_GPIO2->DATA ^= 1<<10) // LPC11C24-DK-A
 // #define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
 // #define BLINK() palTogglePad(GPIO0, 7) // LPCxpresso 11C24
 // #define BLINK()
-
-#define DELAY(ms) delay(ms)
-
-static void delay (int ms) {
-    volatile int i;
-    while (--ms >= 0)
-        for (i = 0; i < 750; ++i)
-            ;
-}
 
 CCAN_MSG_OBJ_T rxMsg;
 uint32_t       myUid [4];
@@ -71,38 +64,50 @@ static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c
     return results[0] == 0 ? results + 1 : 0;
 }
 
-// send first 8 bytes of this chip's UID out to 0x1F123400
+// there's a single "boot configuration byte" at the end of the boot flash area
+static uint8_t bootConfigByte (void) {
+    return 0x01;
+    return *(const uint8_t*) 0x0FFF; // last byte of first 4 KB page in flash
+}
+
+// there is a single CAN bus address to which all boot requests are sent
+// the address sent to includes bits 6..0 of the boot configuration byte
+static int bootRequestAddr (void) {
+    return BOOT_ADDR_BASE | 0x80 | bootConfigByte();
+}
+
+// send first 8 bytes of this chip's UID out to BOOT_ADDR_BASE
 static int bootCheck (void) {
     CCAN_MSG_OBJ_T msgObj;
     
-    // send own uid to a fixed CAN bus address to request a unique 1..255 id
+    // send own uid to a fixed CAN bus address to request a unique 1..127 id
     msgObj.msgobj  = 10;
-    msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
-    // msgObj.mode_id = 0x432;
+    msgObj.mode_id = bootRequestAddr();
     msgObj.mask    = 0x0;
     msgObj.dlc     = 8;
     memcpy(msgObj.data, myUid, 8);
     LPC_CCAN_API->can_transmit(&msgObj);
 
-    // configure message object 1 to receive 29-bit messages to 0x1F123400..FF
+    // configure msg object 1 to receive messages to BOOT_ADDR_BASE + 0..127
+    // the lower 7 bits of the reply address will be the assigned unique id
     msgObj.msgobj = 1;
-    msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
-    msgObj.mask = 0x1FFFFF00;
+    msgObj.mode_id = BOOT_ADDR_BASE;
+    msgObj.mask = 0x1FFFFF80;
     LPC_CCAN_API->config_rxmsgobj(&msgObj);
 
-    // wait up to 100 ms to get a reply
+    // wait briefly to get a reply
     rxMsg.msgobj = 0;
     int i;
-    for (i = 0; i < 100000; ++i) {
+    for (i = 0; i < 50000; ++i) { // empirical value, tries for about 250 ms
         LPC_CCAN_API->isr();
         if (ready) {
             ready = 0;
-            if (memcmp(rxMsg.data, myUid, 8) == 0) {
-                shortId = rxMsg.mode_id; // use lower 8 bits of address as id
+            if (rxMsg.dlc == 8 && memcmp(rxMsg.data, myUid, 8) == 0) {
+                shortId = rxMsg.mode_id; // use lower 7 bits of address as id
 
                 // only listen to the assigned address from now on
                 msgObj.msgobj = 1;
-                msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400 | shortId;
+                msgObj.mode_id = BOOT_ADDR_BASE | shortId;
                 msgObj.mask = 0x1FFFFFFF;
                 LPC_CCAN_API->config_rxmsgobj(&msgObj);
                 msgObj.msgobj = 2;
@@ -113,7 +118,6 @@ static int bootCheck (void) {
                 return 1;
             }
         }
-        // DELAY(1);
     }
     return 0;
 }
@@ -122,34 +126,31 @@ static int download (uint8_t page) {
     // send out a request to receive a 4 KB page
     CCAN_MSG_OBJ_T msgObj;    
     msgObj.msgobj  = 11;
-    msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
-    // msgObj.mode_id = 0x321;
+    msgObj.mode_id = bootRequestAddr();
     msgObj.mask    = 0x0;
-    msgObj.dlc     = 3;
-    msgObj.data[0] = 1;         // boot request for a 4 KB page download
-    msgObj.data[1] = shortId;   // own id
-    msgObj.data[2] = page;      // page index (1..7 for LPC11C24)
+    msgObj.dlc     = 2;
+    msgObj.data[0] = shortId;   // this unit's own assigned id
+    msgObj.data[1] = page;      // page index (1..7 for LPC11C24)
     LPC_CCAN_API->can_transmit(&msgObj);
     
     // wait for entire page to come in, as 8-byte messages
     rxMsg.msgobj = 0;
     uint8_t *p = codeBuf;
     int timer;
-    for (timer = 0; timer < 250000; ++timer) {
+    for (timer = 0; timer < 50000; ++timer) {
         LPC_CCAN_API->isr();
         if (ready) {
             ready = 0;
             if (rxMsg.dlc == 8) {
-                // BLINK();
                 memcpy(p, rxMsg.data, 8);
                 p += 8;
                 if (p >= codeBuf + sizeof codeBuf)
                     return 1; // page reception completed
+                timer = 0; // reset the timeout timer
             }
-            timer = 0; // reset the timeout timer
         }
     }
-    // download ends when messages are not received within 100 ms of each other
+    // download ends when messages are not received within a certain time
     return 0;
 }
 
@@ -171,349 +172,36 @@ int main (void) {
     
     memcpy(myUid, iapCall(READ_UID, 0, 0, 0, 0), sizeof myUid);
     
-    while (!bootCheck())
-        DELAY(1000);
-    
-    uint8_t page = 0;
-    while (download(++page)) {
-        BLINK();
-        saveToFlash(page);
-        BLINK();
+    if (bootConfigByte() & 0x80) {
+        // self-starting mode bit set, only wait up to one second
+        int i;
+        for (i = 0; i < 4; ++i)
+            if (bootCheck())
+                break;
+    } else {
+        // wait indefinitely for a reply from the boot master
+        while (!bootCheck())
+            ;
     }
     
-    if (page > 1) {
-        // set stack pointer
-        asm volatile("ldr r0, =0x1000");
-        asm volatile("ldr r0, [r0]");
-        asm volatile("mov sp, r0");
-        // jump to start address
-        asm volatile("ldr r0, =0x1004");
-        asm volatile("ldr r0, [r0]");
-        asm volatile("mov pc, r0");
+    // only perform download check if an id has been given by the boot master
+    if (shortId > 0) {
+        uint8_t page = 0;
+        while (download(++page)) {
+            BLINK();
+            saveToFlash(page);
+            BLINK();
+        }
     }
     
-    for (;;) {
-        BLINK();
-        DELAY(blinkRate);
-    }
+    // set stack pointer
+    asm volatile("ldr r0, =0x1000");
+    asm volatile("ldr r0, [r0]");
+    asm volatile("mov sp, r0");
+    // jump to start address
+    asm volatile("ldr r0, =0x1004");
+    asm volatile("ldr r0, [r0]");
+    asm volatile("mov pc, r0");
 
     return 0;
-}
-
-void NMIVector(void) __attribute__ (( naked ));
-void HardFaultVector(void) __attribute__ (( naked ));
-void MemManageVector(void) __attribute__ (( naked ));
-void BusFaultVector(void) __attribute__ (( naked ));
-void UsageFaultVector(void) __attribute__ (( naked ));
-void SVCallVector(void) __attribute__ (( naked ));
-void DebugMonitorVector(void) __attribute__ (( naked ));
-void PendSVVector(void) __attribute__ (( naked ));
-void SysTickVector(void) __attribute__ (( naked ));
-
-void NMIVector (void) {
-	asm volatile("ldr r0, =0x1008");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void HardFaultVector (void) {
-	asm volatile("ldr r0, =0x100C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void MemManageVector (void) {
-	asm volatile("ldr r0, =0x1010");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void BusFaultVector (void) {
-	asm volatile("ldr r0, =0x1014");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void UsageFaultVector (void) {
-	asm volatile("ldr r0, =0x1018");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void SVCallVector (void) {
-	asm volatile("ldr r0, =0x102C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void DebugMonitorVector (void) {
-	asm volatile("ldr r0, =0x1030");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void PendSVVector (void) {
-	asm volatile("ldr r0, =0x1038");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void SysTickVector (void) {
-	asm volatile("ldr r0, =0x103C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector20(void) __attribute__ (( naked ));
-void Vector24(void) __attribute__ (( naked ));
-void Vector28(void) __attribute__ (( naked ));
-void Vector34(void) __attribute__ (( naked ));
-
-void Vector20 (void) {
-	asm volatile("ldr r0, =0x1020");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector24 (void) {
-	asm volatile("ldr r0, =0x1024");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector28 (void) {
-	asm volatile("ldr r0, =0x1028");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector34 (void) {
-	asm volatile("ldr r0, =0x1034");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector40(void) __attribute__ (( naked ));
-void Vector44(void) __attribute__ (( naked ));
-void Vector48(void) __attribute__ (( naked ));
-void Vector4C(void) __attribute__ (( naked ));
-void Vector50(void) __attribute__ (( naked ));
-void Vector54(void) __attribute__ (( naked ));
-void Vector58(void) __attribute__ (( naked ));
-void Vector5C(void) __attribute__ (( naked ));
-void Vector60(void) __attribute__ (( naked ));
-void Vector64(void) __attribute__ (( naked ));
-void Vector68(void) __attribute__ (( naked ));
-void Vector6C(void) __attribute__ (( naked ));
-void Vector70(void) __attribute__ (( naked ));
-void Vector74(void) __attribute__ (( naked ));
-void Vector78(void) __attribute__ (( naked ));
-void Vector7C(void) __attribute__ (( naked ));
-void Vector80(void) __attribute__ (( naked ));
-void Vector84(void) __attribute__ (( naked ));
-void Vector88(void) __attribute__ (( naked ));
-void Vector8C(void) __attribute__ (( naked ));
-void Vector90(void) __attribute__ (( naked ));
-void Vector94(void) __attribute__ (( naked ));
-void Vector98(void) __attribute__ (( naked ));
-void Vector9C(void) __attribute__ (( naked ));
-void VectorA0(void) __attribute__ (( naked ));
-void VectorA4(void) __attribute__ (( naked ));
-void VectorA8(void) __attribute__ (( naked ));
-void VectorAC(void) __attribute__ (( naked ));
-void VectorB0(void) __attribute__ (( naked ));
-void VectorB4(void) __attribute__ (( naked ));
-void VectorB8(void) __attribute__ (( naked ));
-void VectorBC(void) __attribute__ (( naked ));
-
-void Vector40 (void) {
-	asm volatile("ldr r0, =0x1040");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector44 (void) {
-	asm volatile("ldr r0, =0x1044");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector48 (void) {
-	asm volatile("ldr r0, =0x1048");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector4C (void) {
-	asm volatile("ldr r0, =0x104C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector50 (void) {
-	asm volatile("ldr r0, =0x1050");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector54 (void) {
-	asm volatile("ldr r0, =0x1054");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector58 (void) {
-	asm volatile("ldr r0, =0x1058");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector5C (void) {
-	asm volatile("ldr r0, =0x105C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector60 (void) {
-	asm volatile("ldr r0, =0x1060");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector64 (void) {
-	asm volatile("ldr r0, =0x1064");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector68 (void) {
-	asm volatile("ldr r0, =0x1068");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector6C (void) {
-	asm volatile("ldr r0, =0x106C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector70 (void) {
-	asm volatile("ldr r0, =0x1070");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector74 (void) {
-	asm volatile("ldr r0, =0x1074");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector78 (void) {
-	asm volatile("ldr r0, =0x1078");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector7C (void) {
-	asm volatile("ldr r0, =0x107C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector80 (void) {
-	asm volatile("ldr r0, =0x1080");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector84 (void) {
-	asm volatile("ldr r0, =0x1084");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector88 (void) {
-	asm volatile("ldr r0, =0x1088");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector8C (void) {
-	asm volatile("ldr r0, =0x108C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector90 (void) {
-	asm volatile("ldr r0, =0x1090");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector94 (void) {
-	asm volatile("ldr r0, =0x1094");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector98 (void) {
-	asm volatile("ldr r0, =0x1098");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void Vector9C (void) {
-	asm volatile("ldr r0, =0x109C");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void VectorA0 (void) {
-	asm volatile("ldr r0, =0x10A0");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void VectorA4 (void) {
-	asm volatile("ldr r0, =0x10A4");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void VectorA8 (void) {
-	asm volatile("ldr r0, =0x10A8");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void VectorAC (void) {
-	asm volatile("ldr r0, =0x10AC");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void VectorB0 (void) {
-	asm volatile("ldr r0, =0x10B0");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void VectorB4 (void) {
-	asm volatile("ldr r0, =0x10B4");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void VectorB8 (void) {
-	asm volatile("ldr r0, =0x10B8");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
-}
-
-void VectorBC (void) {
-	asm volatile("ldr r0, =0x10BC");
-	asm volatile("ldr r0, [r0]");
-	asm volatile("mov pc, r0");
 }
