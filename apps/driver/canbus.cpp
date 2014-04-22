@@ -123,10 +123,10 @@ void canBusStart (int addr) {
 
     readUid(canBus.myUid);
 
-    // send first 8 bytes of this chip's UID out to 0x1F123480 + (boot config)
+    // send first 8 bytes of this chip's UID out to 0x1F123480
     CCAN_MSG_OBJ_T txMsg;    
     txMsg.msgobj  = 20;
-    txMsg.mode_id = CAN_MSGOBJ_EXT | 0x1F123480 | *(const uint8_t*) 0x0FFF;
+    txMsg.mode_id = CAN_MSGOBJ_EXT | 0x1F123480;
     // txMsg.mode_id = 0x123;
     txMsg.mask    = 0x0;
     txMsg.dlc     = 8;

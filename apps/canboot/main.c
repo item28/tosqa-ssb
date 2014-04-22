@@ -16,17 +16,11 @@
 
 #define BOOT_ADDR_BASE  (CAN_MSGOBJ_EXT | 0x1F123400)
 
-// #define BLINK() (LPC_GPIO2->DATA ^= 1<<10) // LPC11C24-DK-A
-// #define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
-// #define BLINK() palTogglePad(GPIO0, 7) // LPCxpresso 11C24
-#define BLINK()
-
 CCAN_MSG_OBJ_T rxMsg;
 uint32_t       myUid [4];
 uint8_t        codeBuf [4096] __attribute__((aligned(4)));
 uint8_t        shortId;
 volatile int   ready;
-int            blinkRate;
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
     rxMsg.msgobj = msg_obj_num;
@@ -56,17 +50,18 @@ static void canBusInit (void) {
 #define READ_UID        58
 
 static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
-    static uint32_t results[5];
-    uint32_t params [5] = { type, a, b, c, d };
-    iap_entry((unsigned*) params, (unsigned*) results);
-    if (results[0] != 0)
-        blinkRate = 100;
-    return results[0] == 0 ? results + 1 : 0;
+    static uint32_t params[5];
+    params[0] = type;
+    params[1] = a;
+    params[2] = b;
+    params[3] = c;
+    params[4] = d;
+    iap_entry((unsigned*) params, (unsigned*) params);
+    return params[0] == 0 ? params + 1 : 0;
 }
 
 // there's a single "boot configuration byte" at the end of the boot flash area
 static uint8_t bootConfigByte (void) {
-    return 0x01;
     return *(const uint8_t*) 0x0FFF; // last byte of first 4 KB page in flash
 }
 
@@ -76,7 +71,7 @@ static int bootRequestAddr (void) {
     return BOOT_ADDR_BASE | 0x80 | bootConfigByte();
 }
 
-// send first 8 bytes of this chip's UID out to BOOT_ADDR_BASE
+// send first 8 bytes of this chip's UID out to 0x1F123480 + (boot config)
 static int bootCheck (void) {
     CCAN_MSG_OBJ_T msgObj;
     
@@ -164,10 +159,6 @@ static void saveToFlash (uint8_t page) {
 
 int main (void) {
     // no clock setup, running on IRC @ 12 MHz
-    
-    LPC_GPIO2->DIR |= 1<<10;
-    blinkRate = 1000;
-
     canBusInit();
     
     memcpy(myUid, iapCall(READ_UID, 0, 0, 0, 0), sizeof myUid);
@@ -187,11 +178,8 @@ int main (void) {
     // only perform download check if an id has been given by the boot master
     if (shortId > 0) {
         uint8_t page = 0;
-        while (download(++page)) {
-            BLINK();
+        while (download(++page))
             saveToFlash(page);
-            BLINK();
-        }
     }
     
     // set stack pointer

@@ -420,8 +420,8 @@ static msg_t can_rx(void * p) {
             ++i;
         if (i >= nextNode)
           memcpy(nodeMap[nextNode++], rxmsg.data8, 8);
-        chprintf(chp1, "CAN announce %08x %08x -> %d\r\n",
-                        rxmsg.data32[0], rxmsg.data32[1], i);
+        chprintf(chp1, "CAN  ann %08x: %08x %08x -> %d\r\n",
+                        rxmsg.EID, rxmsg.data32[0], rxmsg.data32[1], i);
         txmsg.EID = 0x1F123400 + i;
         memcpy(txmsg.data8, rxmsg.data8, 8);
         canTransmit(&CAND1, 1, &txmsg, 100);
