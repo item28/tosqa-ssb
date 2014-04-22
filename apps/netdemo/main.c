@@ -398,7 +398,7 @@ int nextNode = 1;
 FIL fil;
 FILINFO filinfo;
 
-static bool_t sendFile (uint8_t id, uint8_t page) {
+static bool_t sendFile (uint8_t dest, uint8_t id, uint8_t page) {
   char filename[20];
   chsnprintf(filename, sizeof filename, "tosqa%03d.bin", id);
   FRESULT res = f_stat(filename, &filinfo);
@@ -412,7 +412,7 @@ static bool_t sendFile (uint8_t id, uint8_t page) {
     
   CANTxFrame txmsg;
   txmsg.IDE = CAN_IDE_EXT;
-  txmsg.EID = 0x1F123400 + id;
+  txmsg.EID = 0x1F123400 + dest;
   txmsg.RTR = CAN_RTR_DATA;
   txmsg.DLC = 8;
 
@@ -465,7 +465,7 @@ static msg_t can_rx (void * p) {
       } else if (rxmsg.DLC == 2) {
         uint8_t dest = rxmsg.data8[0], page = rxmsg.data8[1];
         chprintf(chp1, "CAN boot %08x: %02x #%d ", rxmsg.EID, dest, page);
-        if (sendFile(dest, page))
+        if (sendFile(dest, rxmsg.EID & 0x7F, page))
           chprintf(chp1, " SENT");
         chprintf(chp1, "\r\n");
       }
