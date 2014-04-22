@@ -133,9 +133,40 @@ void sdoWriteDataSegment(uint8_t header, const uint8_t* data, int length) {
     sendAndWait(header, 8);
 }
 
-// the boot configuration is read from jumpers set in a couple of I/O pins
+// 3 = P0_3/P0_5, 2 = P0_4/P3_3, 1 = P1_10/P1_11, 0 = P2_3/P2_6
+// 7 = P0_7/P2_0, 6 = P2_1/P2_2, 5 = P0_11/P1_0, 4 = P1_1/P1_2
+
+// the boot configuration is set with jumpers placed between different I/O pins
+// see http://jeelabs.net/projects/tosca/wiki/Boot_installer
 static uint8_t getBootConfigByte () {
-    return 0x01;
+    // avoid special pin modes, use GPIO for PIO0_11 and PIO1_1
+    LPC_IOCON->R_PIO0_11 = 0xD1;
+    LPC_IOCON->R_PIO1_1 = 0xD1;
+    // inputs: P0_3, P1_0, P1_2, P1_11, P2_0, P2_2, P2_6, P3_3 
+    LPC_GPIO0->DIR &= ~(1<<3);
+    LPC_GPIO1->DIR &= ~(1<<0) & ~(1<<2) & ~(1<<11);
+    LPC_GPIO2->DIR &= ~(1<<0) & ~(1<<2) & ~(1<<6);
+    LPC_GPIO3->DIR &= ~(1<<3);
+    // outputs: P0_4, P0_5, P0_7, P0_11, P1_1, P1_10, P2_1, P2_3
+    LPC_GPIO0->DIR |= (1<<4) | (1<<5) | (1<<7) | (1<<11);
+    LPC_GPIO1->DIR |= (1<<1) | (1<<10);
+    LPC_GPIO2->DIR |= (1<<1) | (1<<3);
+    // set all outputs low
+    LPC_GPIO0->DATA &= ~(1<<4) & ~(1<<5) & ~(1<<7) & ~(1<<11);
+    LPC_GPIO1->DATA &= ~(1<<1) & ~(1<<10);
+    LPC_GPIO2->DATA &= ~(1<<1) & ~(1<<3);
+    // read the input bits - will be high when not jumpered, due to pull-ups
+    uint8_t b = 0;
+    if (LPC_GPIO2->DATA & (1<<0))  b |= 1<<7;
+    if (LPC_GPIO2->DATA & (1<<2))  b |= 1<<6;
+    if (LPC_GPIO1->DATA & (1<<0))  b |= 1<<5;
+    if (LPC_GPIO1->DATA & (1<<2))  b |= 1<<4;
+    if (LPC_GPIO0->DATA & (1<<3))  b |= 1<<3;
+    if (LPC_GPIO3->DATA & (1<<3))  b |= 1<<2;
+    if (LPC_GPIO1->DATA & (1<<11)) b |= 1<<1;
+    if (LPC_GPIO2->DATA & (1<<6))  b |= 1<<0;
+
+    return ~b; // jumper set means pulled low, but should be returned as "1"
 }
 
 int main () {
