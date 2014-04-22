@@ -25,7 +25,6 @@
 #include "web/web.h"
 #include "ff.h"
 #include "evtimer.h"
-#include "data.h"
 
 /*===========================================================================*/
 /* Card insertion monitor.                                                   */
@@ -392,12 +391,49 @@ static const CANFilterConfig canfcfg = {
 /*
  * CAN receiver thread.
  */
-static WORKING_AREA(can_rx_wa, 256);
+static WORKING_AREA(can_rx_wa, 512);
 
-static uint8_t nodeMap[20][8];
+static uint8_t nodeMap[30][8];
 int nextNode = 1;
+FIL fil;
+FILINFO filinfo;
 
-static msg_t can_rx(void * p) {
+static bool_t sendFile (uint8_t id, uint8_t page) {
+  char filename[20];
+  chsnprintf(filename, sizeof filename, "tosqa%03d.bin", id);
+  FRESULT res = f_stat(filename, &filinfo);
+  if (res == 0)
+    res = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
+  if (res != 0)
+    return false;
+
+  chprintf(chp1, "(%s: %db)", filename, filinfo.fsize);
+  chThdSleepMilliseconds(100);
+    
+  CANTxFrame txmsg;
+  txmsg.IDE = CAN_IDE_EXT;
+  txmsg.EID = 0x1F123400 + id;
+  txmsg.RTR = CAN_RTR_DATA;
+  txmsg.DLC = 8;
+
+  res = f_lseek(&fil, (page - 1) * 4096);
+  if (res == 0) {  
+    int i;
+    for (i = 0; i < 512; ++i) {
+      UINT count;
+      res = f_read(&fil, txmsg.data8, 8, &count);
+      if (res != 0 || (i == 0 && count == 0))
+        break;
+      memset(txmsg.data8 + count, 0xFF, 8 - count);
+      canTransmit(&CAND1, 1, &txmsg, 100); // 1 mailbox, must send in-order!
+    }
+  }
+  
+  f_close(&fil);
+  return res == 0;
+}
+
+static msg_t can_rx (void * p) {
   (void)p;
   CANRxFrame rxmsg;
 
@@ -420,7 +456,7 @@ static msg_t can_rx(void * p) {
             ++i;
         if (i >= nextNode)
           memcpy(nodeMap[nextNode++], rxmsg.data8, 8);
-        chprintf(chp1, "CAN  ann %08x: %08x %08x -> %d\r\n",
+        chprintf(chp1, "\r\nCAN  ann %08x: %08x %08x -> %d\r\n",
                         rxmsg.EID, rxmsg.data32[0], rxmsg.data32[1], i);
         txmsg.EID = 0x1F123400 + i;
         memcpy(txmsg.data8, rxmsg.data8, 8);
@@ -429,21 +465,8 @@ static msg_t can_rx(void * p) {
       } else if (rxmsg.DLC == 2) {
         uint8_t dest = rxmsg.data8[0], page = rxmsg.data8[1];
         chprintf(chp1, "CAN boot %08x: %02x #%d ", rxmsg.EID, dest, page);
-        if ((rxmsg.EID & 0x7F) == 1) { // it's an SSB board
-          const uint8_t* p = bootData + 4096 * (page - 1);
-          if (dest > 0 && bootData <= p && p < bootData + sizeof bootData) {
-            txmsg.EID = 0x1F123400 + dest;
-            int i;
-            for (i = 0; i < 4096; i += 8) {
-              if (i >= 4000)
-                chprintf(chp1, ".");
-              memcpy(txmsg.data8, p + i, 8);
-              canTransmit(&CAND1, 1, &txmsg, 100); // 1 mailbox, send in-order!
-              // chThdSleepMilliseconds(1);
-            }
-            chprintf(chp1, " ok");
-          }
-        }
+        if (sendFile(dest, page))
+          chprintf(chp1, " SENT");
         chprintf(chp1, "\r\n");
       }
     }
