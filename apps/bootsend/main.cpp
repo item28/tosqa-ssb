@@ -1,38 +1,67 @@
 // boot send - send firmware via CAN @ 100 KHz using CANopen
 // jcw, 2014-04-14
 
-#include "ch.h"
-#include "hal.h"
-#include "data.h"
 #include <string.h>
+
+#include "LPC11xx.h"
+#include "data.h"
 
 #define IAP_ENTRY_LOCATION      0X1FFF1FF1
 #define LPC_ROM_API_BASE_LOC    0x1FFF1FF8
 #define LPC_ROM_API             (*(LPC_ROM_API_T**) LPC_ROM_API_BASE_LOC)
 
+#define INLINE inline
+
 #include "nxp/romapi_11xx.h"
 #include "nxp/ccand_11xx.h"
 
 CCAN_MSG_OBJ_T rxMsg, txMsg;
-volatile bool ready;
+bool           ready;
+uint8_t        codeBuf [4096] __attribute__((aligned(4)));
+uint16_t       error;
+
+static void delay (int ms) {
+    volatile int i;
+    while (--ms >= 0)
+        for (i = 0; i < 3000; ++i)
+            ;
+}
+
+// display N brief blips followed by a long pause
+static void blinkLed (int count) {
+    // disable CAN so that it no longer interferes with other CAN traffic
+    LPC_SYSCON->SYSAHBCLKCTRL &= ~(1<<17); // SYSCTL_CLOCK_CAN
+
+    if (count > 0) // display count error blips
+        for (;;) {
+            for (int i = 0; i < count; ++i) {
+                LPC_GPIO0->DATA ^= 1<<7;
+                delay(50);
+                LPC_GPIO0->DATA ^= 1<<7;
+                delay(250);
+            }
+            delay(2000);
+        }
+    else // no error, display a steady 0.5 Hz blink
+        for (;;) {
+            LPC_GPIO0->DATA ^= 1<<7;
+            delay(1000);
+        }
+}
 
 static void CAN_rxCallback (uint8_t msg_obj_num) {
     rxMsg.msgobj = msg_obj_num;
     LPC_CCAN_API->can_receive(&rxMsg);
-    palTogglePad(GPIO3, GPIO3_MOTOR_EN); // PIO3_0 = LED1 on Open11C14 board
     ready = true;
 }
 
-static void CAN_txCallback (uint8_t /* msg_obj_num */) {}
-
 static void CAN_errorCallback (uint32_t error_info) {
-    if (error_info & 0x0002)
-        palTogglePad(GPIO3, GPIO3_MOTOR_SLEEP); // PIO3_2 = LED3 on Open11C14
+    error |= error_info;
 }
 
 static CCAN_CALLBACKS_T callbacks = {
     CAN_rxCallback,
-    CAN_txCallback,
+    NULL,
     CAN_errorCallback,
     NULL,
     NULL,
@@ -40,13 +69,6 @@ static CCAN_CALLBACKS_T callbacks = {
     NULL,
     NULL,
 };
-
-extern "C" void Vector74 ();
-CH_IRQ_HANDLER(Vector74)    {
-    CH_IRQ_PROLOGUE();
-    LPC_CCAN_API->isr();
-    CH_IRQ_EPILOGUE();
-}
 
 static void initCan () {
     LPC_SYSCON->SYSAHBCLKCTRL |= 1 << 17; // SYSCTL_CLOCK_CAN
@@ -57,9 +79,8 @@ static void initCan () {
         0x000076DDUL    // CAN_BTR, 100 Kbps CAN bus rate
     };
 
-    LPC_CCAN_API->init_can(clkInitTable, true);
+    LPC_CCAN_API->init_can(clkInitTable, false);
     LPC_CCAN_API->config_calb(&callbacks);
-    NVIC_EnableIRQ(CAN_IRQn);
 }
 
 static void sendAndWait(uint8_t header, int length) {
@@ -71,10 +92,12 @@ static void sendAndWait(uint8_t header, int length) {
 
     ready = false;
     LPC_CCAN_API->can_transmit(&txMsg);
-    palTogglePad(GPIO3, GPIO3_DIGIPOT_CS); // LED2 on Open11C14 board
-    while (!ready)
-        chThdYield();
-    palTogglePad(GPIO3, GPIO3_DIGIPOT_CS);
+    for (int i = 0; i < 100000; ++i) {
+        LPC_CCAN_API->isr();
+        if (ready)
+            return;
+    }
+    blinkLed(2);
 }
 
 static void sendReq(uint8_t header, uint16_t index, uint8_t subindex, const uint8_t* data, int length) {
@@ -86,8 +109,7 @@ static void sendReq(uint8_t header, uint16_t index, uint8_t subindex, const uint
     sendAndWait(header, 8);
     
     if (txMsg.data[7] & 0x08)
-        for (;;)
-            ; // error reported, hang
+        blinkLed(3);
 }
 
 void sdoWriteExpedited(uint16_t index, uint8_t subindex, const uint32_t data, uint8_t length) {
@@ -111,18 +133,19 @@ void sdoWriteDataSegment(uint8_t header, const uint8_t* data, int length) {
     sendAndWait(header, 8);
 }
 
-uint32_t devType, uid[4];
+// the boot configuration is read from jumpers set in a couple of I/O pins
+static uint8_t getBootConfigByte () {
+    return 0x01;
+}
 
 int main () {
-    halInit();
-    chSysInit();
+    LPC_GPIO0->DIR |= 1<<7;     // LED is PIO0_7 on the LPCxpresso 11C24
+    LPC_GPIO0->DATA &= ~(1<<7); // turn LED off
+
+    delay(1000); // wait 1s after power-up before uploading to target
+
     initCan();
 
-    // brief red flash on startup
-    palTogglePad(GPIO0, GPIO0_LED2);
-    chThdSleepMilliseconds(100);
-    palTogglePad(GPIO0, GPIO0_LED2);
-    
     /* Configure message object 1 to receive all 11-bit messages 0x5FD */
     static CCAN_MSG_OBJ_T msg;
     msg.msgobj = 1;
@@ -131,12 +154,16 @@ int main () {
     LPC_CCAN_API->config_rxmsgobj(&msg);
 
     // read device type ("LPC1")
-    devType = sdoReadSegmented(0x1000, 0);
+    uint32_t devType = sdoReadSegmented(0x1000, 0);
+    if (memcmp(&devType, "LPC1", 4) != 0)
+        blinkLed(4);
+
     // read 16-byte serial number
-    uid[0] = sdoReadSegmented(0x5100, 1);
-    uid[1] = sdoReadSegmented(0x5100, 2);
-    uid[2] = sdoReadSegmented(0x5100, 3);
-    uid[3] = sdoReadSegmented(0x5100, 4);
+    // uint32_t uid[4];
+    // uid[0] = sdoReadSegmented(0x5100, 1);
+    // uid[1] = sdoReadSegmented(0x5100, 2);
+    // uid[2] = sdoReadSegmented(0x5100, 3);
+    // uid[3] = sdoReadSegmented(0x5100, 4);
     
     // unlock for upload
     uint16_t unlock = 23130;
@@ -146,39 +173,36 @@ int main () {
     // erase sectors
     sdoWriteExpedited(0x5030, 0, 0x0000, 2);
 
-#if 1
-    // start write to RAM
-    sdoWriteExpedited(0x5015, 0, 0x10001000, 4); // ram address
-    // upload code to RAM
-    sdoWriteSegmented(0x1F50, 1, 0x1000);
-    uint8_t toggle = 0;
-    for (size_t i = 0; i < sizeof bootData; i += 7) {
-        sdoWriteDataSegment(toggle, bootData + i, 7);
-        toggle ^= 0x10;
-    }
+    if (getBootConfigByte() != 0) {
+        // copy code to RAM buffer and add the boot config byte
+        memset(codeBuf, 0xFF, sizeof codeBuf);
+        memcpy(codeBuf, bootData, sizeof bootData);
+        codeBuf[sizeof codeBuf-1] = getBootConfigByte();
 
-    // prepare sectors
-    sdoWriteExpedited(0x5020, 0, 0x0000, 2);
-    // copy ram to flash
-    sdoWriteExpedited(0x5050, 1, 0x00000000, 4);    // flash address
-    sdoWriteExpedited(0x5050, 2, 0x10001000, 4);    // ram address
-    sdoWriteExpedited(0x5050, 3, 0x1000, 2);        // 4096 bytes
-#endif
+        // start write to RAM
+        sdoWriteExpedited(0x5015, 0, 0x10000800, 4); // ram address
+        // upload code to RAM
+        sdoWriteSegmented(0x1F50, 1, 0x1000);
+        uint8_t toggle = 0;
+        for (size_t i = 0; i < sizeof codeBuf; i += 7) {
+            sdoWriteDataSegment(toggle, codeBuf + i, 7);
+            toggle ^= 0x10;
+        }
+
+        // prepare sectors
+        sdoWriteExpedited(0x5020, 0, 0x0000, 2);
+        // copy ram to flash
+        sdoWriteExpedited(0x5050, 1, 0x00000000, 4);    // flash address
+        sdoWriteExpedited(0x5050, 2, 0x10000800, 4);    // ram address
+        sdoWriteExpedited(0x5050, 3, 0x1000, 2);        // 4096 bytes
+    }
     
     // G 0000
     sdoWriteExpedited(0x5070, 0, 0, 4);
     sdoWriteExpedited(0x1F51, 1, 1, 1);
 
-    // disable CAN so that it no longer interferes with other CAN traffic
-    LPC_SYSCON->SYSAHBCLKCTRL &= ~(1<<17); // SYSCTL_CLOCK_CAN
-
-    // blink LED at 1 Hz
-    for (;;) {
-        chThdSleepMilliseconds(500);
-        // palTogglePad(GPIO1, GPIO1_LED1);
-        palTogglePad(GPIO3, GPIO3_MOTOR_MS1); // LED4 on Open11C14 board
-        // palTogglePad(GPIO2, GPIO2_HALL_MODE);
-    }
+    // 5 quick blips if there has been any CAN error, or steady blink if all ok
+    blinkLed(error ? 5 : 0);
 
     return 0;
 }
