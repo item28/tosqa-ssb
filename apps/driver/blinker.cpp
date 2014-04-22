@@ -10,6 +10,7 @@ static msg_t blinkerTh (void*) {
         #else
             palTogglePad(GPIO1, GPIO1_LED1);
         #endif
+        palTogglePad(GPIO2, GPIO2_HALL_MODE); // PIO2_10 = LED on LPC11C24-DK-A
     }
     return 0;
 }

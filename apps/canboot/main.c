@@ -16,10 +16,10 @@
 
 #define BOOT_ADDR_BASE  (CAN_MSGOBJ_EXT | 0x1F123400)
 
-#define BLINK() (LPC_GPIO2->DATA ^= 1<<10) // LPC11C24-DK-A
+// #define BLINK() (LPC_GPIO2->DATA ^= 1<<10) // LPC11C24-DK-A
 // #define BLINK() palTogglePad(GPIO2, 10) // LPC11C24-DK-A
 // #define BLINK() palTogglePad(GPIO0, 7) // LPCxpresso 11C24
-// #define BLINK()
+#define BLINK()
 
 CCAN_MSG_OBJ_T rxMsg;
 uint32_t       myUid [4];
@@ -66,6 +66,7 @@ static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c
 
 // there's a single "boot configuration byte" at the end of the boot flash area
 static uint8_t bootConfigByte (void) {
+    return 0x01;
     return *(const uint8_t*) 0x0FFF; // last byte of first 4 KB page in flash
 }
 

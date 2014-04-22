@@ -13,7 +13,7 @@ import (
 	"os"
 )
 
-const filename = "../blinker/build/ssb.bin"
+const filename = "../driver/build/ssb.bin"
 
 func main() {
 	data, err := ioutil.ReadFile(filename)
