@@ -13,7 +13,7 @@ import (
 	"os"
 )
 
-const filename = "../minimal/build/min.bin"
+const filename = "../blinker/build/ssb.bin"
 
 func main() {
 	data, err := ioutil.ReadFile(filename)

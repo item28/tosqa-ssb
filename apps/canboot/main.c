@@ -66,7 +66,6 @@ static const uint32_t* iapCall(uint32_t type, uint32_t a, uint32_t b, uint32_t c
 
 // there's a single "boot configuration byte" at the end of the boot flash area
 static uint8_t bootConfigByte (void) {
-    return 0x01;
     return *(const uint8_t*) 0x0FFF; // last byte of first 4 KB page in flash
 }
 

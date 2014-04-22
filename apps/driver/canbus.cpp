@@ -114,19 +114,19 @@ void canBusInit () {
 void canBusStart (int addr) {
     listenAddressRange(addr);
 
-    // configure message object 2 to receive 29-bit messages to 0x1F123400..FF
+    // configure msg object 2 to receive message address range 0x1F123400..7F
     CCAN_MSG_OBJ_T msgObj;    
     msgObj.msgobj = 2;
     msgObj.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
-    msgObj.mask = 0x1FFFFF00;
+    msgObj.mask = 0x1FFFFF80;
     LPC_CCAN_API->config_rxmsgobj(&msgObj);
 
     readUid(canBus.myUid);
 
-    // send first 8 bytes of this chip's UID out to 0x1F123400
+    // send first 8 bytes of this chip's UID out to 0x1F123480 + (boot config)
     CCAN_MSG_OBJ_T txMsg;    
     txMsg.msgobj  = 20;
-    txMsg.mode_id = CAN_MSGOBJ_EXT | 0x1F123400;
+    txMsg.mode_id = CAN_MSGOBJ_EXT | 0x1F123480 | *(const uint8_t*) 0x0FFF;
     // txMsg.mode_id = 0x123;
     txMsg.mask    = 0x0;
     txMsg.dlc     = 8;

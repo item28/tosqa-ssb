@@ -90,13 +90,6 @@ static void sendReq(uint8_t header, uint16_t index, uint8_t subindex, const uint
             ; // error reported, hang
 }
 
-// not supported by LPC CAN boot loader?
-// uint32_t sdoReadExpedited(uint16_t index, uint8_t subindex, uint8_t length) {
-//   sendReq((2<<5) | ((4-length)<<2) | 0b11, index, subindex, zero, length);
-//   return (rxMsg.data[7] << 24) | (rxMsg.data[6] << 16) |
-//          (rxMsg.data[5] << 8) | rxMsg.data[4];
-// }
-
 void sdoWriteExpedited(uint16_t index, uint8_t subindex, const uint32_t data, uint8_t length) {
     sendReq((1<<5) | ((4-length)<<2) | 0b11, index, subindex, (uint8_t*) &data, length);
 }
@@ -179,7 +172,7 @@ int main () {
     // disable CAN so that it no longer interferes with other CAN traffic
     LPC_SYSCON->SYSAHBCLKCTRL &= ~(1<<17); // SYSCTL_CLOCK_CAN
 
-    // blink LED at 2 Hz
+    // blink LED at 1 Hz
     for (;;) {
         chThdSleepMilliseconds(500);
         // palTogglePad(GPIO1, GPIO1_LED1);
