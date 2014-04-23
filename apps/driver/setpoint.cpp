@@ -61,6 +61,7 @@ void setpointInit () {
 
 // add a next setpoint for the stepper to go to, will wait if queue is full
 void setpointAdd (const Setpoint& s) {
+    // TODO: silly approach, should use first/last indices into circular buffer
     for (int i = 0; i < SETPOINT_QUEUE_SIZE; ++i)
         if (!isInUse(i)) {
             setInUse(i);

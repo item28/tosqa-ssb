@@ -47,26 +47,22 @@ static void blinkerInit ();
 #include "setpoint.cpp"
 
 static void processIncomingRequest () {
-    if (canBus.rxMessage.dlc == 8) {
-        const void* p = canBus.rxMessage.data;
-        switch (canBus.rxMessage.mode_id & 0x03) {
-            case 0:
-                motionParams(*(const MotionParams*) p);
-                break;
-            case 1:
-                setpointAdd(*(const Setpoint*) p);
-                break;
-            case 2:
-                break; // unused
-            case 3:
-                switch (canBus.rxMessage.data[0]) {
-                    case 0: // abort
-                        motionStop();
-                        setpointReset();
-                        break;
-                }
-                break;
-        }
+    const uint8_t* p = canBus.rxMessage.data;
+    switch ((canBus.rxMessage.mode_id & 0x300) | canBus.rxMessage.dlc) {
+        case 0x108:
+            setpointAdd(*(const Setpoint*) p);
+            break;
+        case 0x208:
+            motionParams(*(const MotionParams*) p);
+            break;
+        case 0x301:
+            switch (*p) {
+                case 0: // abort
+                    motionStop();
+                    setpointReset();
+                    break;
+            }
+            break;
     }
 }
 
@@ -75,7 +71,7 @@ static void reportQueueAvail (int slots) {
         return; // no assigned ID, can't send report packets out
     CCAN_MSG_OBJ_T txMsg;
     txMsg.msgobj = 10;
-    txMsg.mode_id = 0x400 | (canBus.shortId << 3);
+    txMsg.mode_id = 0x100 | canBus.shortId;
     txMsg.dlc = 2;
     txMsg.data[0] = slots;
     txMsg.data[1] = 0; // TODO: status and mode info

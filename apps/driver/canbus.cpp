@@ -24,7 +24,7 @@ static void listenAddressRange (int addr) {
     CCAN_MSG_OBJ_T msgObj;
     msgObj.msgobj = 1;
     msgObj.mode_id = addr;
-    msgObj.mask = 0x7FC;
+    msgObj.mask = 0x4FF; // bits 9..8 are request type, not in mask
     // if (addr >= 0x800) {
     //     msgObj.mode_id |= CAN_MSGOBJ_EXT;
     //     msgObj.mask = 0x1FFFFFFC;
@@ -51,9 +51,7 @@ static void CAN_rxCallback (uint8_t msg_obj_num) {
             // the lower 7 bits of the msg id are bits 9..3 to listen to
         if (msgObj.dlc == 8 && memcmp(msgObj.data, canBus.myUid, 8) == 0) {
                 canBus.shortId = msgObj.mode_id & 0x7F;
-                // bit 10 = 0 for outgoing queue fill reports
-                // bit 10 = 1 for incoming setpoints and other requests
-                listenAddressRange(0x400 | (canBus.shortId << 3));
+                listenAddressRange(canBus.shortId);
             }
             break;
         default:
