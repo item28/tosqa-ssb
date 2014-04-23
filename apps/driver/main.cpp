@@ -87,7 +87,7 @@ int main () {
     setpointInit();
     blinkerInit();
 
-    #if 1
+    #if 0
         static Setpoint sp;
         sp.time = 2000*8;   // 2000 ms
         sp.position = 200;  // 10 ms/step
