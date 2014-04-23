@@ -4,16 +4,16 @@
 #define MHZ 48  // timer rate, same as system clock w/o prescaler
 
 static struct {
-    MotionParams params;     // motor limits
-    int          targetPos;  // where the stepper needs to go
-    int          incOrDec;   // +1 if forward, -1 if backward
-    uint32_t     stepsToGo;  // drops to 0 when motion is done
+    MotionParams params;    // motor limits
+    int          ssTarget;  // where the stepper needs to go, in sub-steps
+    int          direction; // +1 if forward, -1 if backward
+    volatile int ssToGo;    // sub-steps to go, drops to <= 0 when done
 } motion;
 
 extern "C" void Vector88 (); // CT32B0
 CH_FAST_IRQ_HANDLER(Vector88)  {
-    LPC_TMR32B0->IR = LPC_TMR32B0->IR; // clear all interrupts for this timer
-    --motion.stepsToGo;
+    LPC_TMR32B0->IR = LPC_TMR32B0->IR;  // clear all interrupts for this timer
+    motion.ssToGo -= 256;               // move in real, not fractional, steps
 }
 
 void motionInit () {
@@ -32,12 +32,10 @@ void motionInit () {
     nvicEnableVector(TIMER_32_0_IRQn, LPC11xx_PWM_CT32B0_IRQ_PRIORITY);
 }
 
-// figure out the current position of the stepper motor
-static int currentPosition () {
-    // if there are still steps to go, then the targetPos hasn't been reached
-    // FIXME: there's a roundoff error when going from microsteps to position
-    int pendingTravel = (motion.stepsToGo << 8) / motion.params.posFactor;
-    return motion.targetPos - motion.incOrDec * pendingTravel;
+// return the current position of the stepper motor in sub-steps (steps * 256)
+static int currentSubStep () {
+    // if there are still steps to go, then target position hasn't been reached
+    return motion.ssTarget - motion.direction * motion.ssToGo;
 }
 
 // set the motion configuration parameters
@@ -59,33 +57,35 @@ void motionParams (const MotionParams& p) {
 
 // move to the given setpoint
 void motionTarget (const Setpoint& s) {
-    LPC_TMR32B0->TCR = 0; // stop interrupts so stepsToGo won't change
+    LPC_TMR32B0->TCR = 0; // stop interrupts so ssToGo won't change
     
-    int pos = s.position;
+    int ssEndPos = s.position * motion.params.posFactor;
     if (s.relative)
-        pos += currentPosition();
+        ssEndPos += currentSubStep();
     
-    if (pos < motion.params.minPos)
-        pos = motion.params.minPos;
-    else if (pos > motion.params.maxPos)
-        pos = motion.params.maxPos;
+    if (ssEndPos < motion.params.minPos * motion.params.posFactor)
+        ssEndPos = motion.params.minPos * motion.params.posFactor;
+    else if (ssEndPos > motion.params.maxPos * motion.params.posFactor)
+        ssEndPos = motion.params.maxPos * motion.params.posFactor;
     
-    int diff = pos - currentPosition();
-    motion.incOrDec = diff > 0 ? 1 : -1;
-    motion.stepsToGo = (diff * motion.incOrDec * motion.params.posFactor) >> 8;
-    motion.targetPos = pos;
+    int ssDiff = ssEndPos - currentSubStep();
+    motion.direction = ssDiff > 0 ? 1 : -1;
+    motion.ssToGo = ssDiff * motion.direction;
+    motion.ssTarget = ssEndPos;
 
-    if (motion.stepsToGo > 0) {
-        uint32_t rate = (MHZ * 1000 * s.time) / motion.stepsToGo; // linear
+    if (ssDiff != 0) {
+        // use 64-bit by 32-bit division to get max accuracy without overflow
+        // this will add 2 KB to the code size...
+        uint32_t rate = (MHZ * 1000LL * s.time * 256 + 128) / motion.ssToGo;
         if (rate < MHZ * 10)
-            rate = MHZ * 10;        // 10 µs, max 100 KHz
+            rate = MHZ * 10;                // at least 10 µs, i.e. max 100 KHz
         LPC_TMR32B0->MR3 = rate;
     
-        palWritePad(GPIO1, GPIO1_MOTOR_DIR, diff > 0 ? 1 : 0);
+        palWritePad(GPIO1, GPIO1_MOTOR_DIR, ssDiff > 0 ? 1 : 0);
         palClearPad(GPIO3, GPIO3_MOTOR_EN); // active low, on
         LPC_TMR32B0->TCR = 1;               // start timer
 
-        while (motion.stepsToGo > 0)        // move!
+        while (motion.ssToGo > 0)           // move!
             chThdYield();                   // uses idle polling
     } else if (s.time > 0)
         chThdSleepMilliseconds(s.time);     // dwell
@@ -97,8 +97,9 @@ void motionTarget (const Setpoint& s) {
 // stop all motion, regardless of what is currently happening
 void motionStop () {
     Setpoint next;
-    next.time = 1;                          // stop as soon as possible
-    next.position = currentPosition();      // request to stop on current pos
-    next.velocity = 0;                      // ends with stepper not moving
+    next.time = 1;          // stop as soon as possible
+    next.position = 0;      // request to stop on current pos
+    next.relative = 1;      // ... by specifying a relative motion of zero
+    next.velocity = 0;      // ends with stepper not moving
     motionTarget(next);
 }
