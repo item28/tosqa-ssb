@@ -3,15 +3,27 @@
 // Setpoints include a target position as well as an "exit" velocity.
 // If there is no work, the stepper will stop as quickly as possible.
 
-#define SETPOINT_QUEUE_SIZE 32 // can't be > 32, see inUse
+#define SETPOINT_QUEUE_SIZE 250
 
 // internal state
 static struct {
-    Mailbox       mailbox;
-    msg_t         buffer [SETPOINT_QUEUE_SIZE-1];
-    Setpoint      setpoints [SETPOINT_QUEUE_SIZE];
-    uint32_t      inUse; // 1 bit for each entry in setPoints
+    Mailbox     mailbox;
+    msg_t       buffer [SETPOINT_QUEUE_SIZE-1];
+    Setpoint    setpoints [SETPOINT_QUEUE_SIZE];
+    uint8_t     inUse [(SETPOINT_QUEUE_SIZE + 7)/8]; // 1 bit per entry
 } setpoint;
+
+static bool isInUse (uint32_t n) {
+    return (setpoint.inUse[n/8] >> (n%8)) & 1;
+}
+
+static void setInUse (uint32_t n) {
+    setpoint.inUse[n/8] |= 1 << (n%8);
+}
+
+static void clearInUse (uint32_t n) {
+    setpoint.inUse[n/8] &= ~ (1 << (n%8));
+}
 
 static WORKING_AREA(waStepperTh, 128);
 
@@ -26,7 +38,7 @@ static msg_t stepperTh (void*) {
                 palClearPad(GPIO1, GPIO1_OLI_LED1); // active low, on
             #endif
             motionTarget(setpoint.setpoints[spIndex]);
-            setpoint.inUse |= 1 << spIndex;
+            clearInUse(spIndex);
             timeout = TIME_IMMEDIATE;
         } else {
             // there is no work, stop the stepper and wait for next cmd
@@ -50,8 +62,8 @@ static void setpointInit () {
 // add a next setpoint for the stepper to go to, will wait if queue is full
 static void setpointAdd (const Setpoint& s) {
     for (int i = 0; i < SETPOINT_QUEUE_SIZE; ++i)
-        if ((setpoint.inUse & (1 << i)) == 0) {
-            setpoint.inUse |= 1 << i;
+        if (!isInUse(i)) {
+            setInUse(i);
             setpoint.setpoints[i] = s;
             chMBPost(&setpoint.mailbox, i, TIME_INFINITE);
             return;
