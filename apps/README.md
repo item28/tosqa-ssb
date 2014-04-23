@@ -9,6 +9,7 @@ Brief description of the applications in this area:
 * **digipot** - move the digital vref adjust through its entire range
 * **driver** - complete CAN and stepper driver for the SSB
 * **fakeboot** - test re-flashing code and the secondary boot mechanism
+* **knobdial** - read out rotary switches and drive other stepper boards
 * **minimal** - absolutely minimal blinker, no ChibiOS or other libs
 * **netdemo** - test application for the AOAA board's LPC1769
 * **pwmstep** - a first test to drive the stepper motor from PWM
