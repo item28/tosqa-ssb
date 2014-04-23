@@ -16,7 +16,7 @@ CH_FAST_IRQ_HANDLER(Vector88)  {
     LPC_TMR32B0->IR = LPC_TMR32B0->IR;      // clear interrupts for this timer
     LPC_TMR32B0->EMR &= ~(1<<3);            // clear output pin manually
     if (--motion.stepsToGo == 0)
-      LPC_TMR32B0->MR3 = ~0;                // timer count to max, don't stop
+        LPC_TMR32B0->MR3 = ~0;              // timer count to max, don't stop
 }
 
 void motionInit () {
@@ -58,24 +58,31 @@ void motionParams (const MotionParams& p) {
     palWritePad(GPIO1, GPIO1_MOTOR_MS3, (p.microStep >> 0) & 1);
 }
 
+// map positions to real steps through an 8.8 fractional multiplication factor
+static int posToStep (int pos) {
+    return (pos * motion.params.posFactor + 128) / 256; // 24.8 -> int w/ round
+}
+
 // move to the given setpoint
 void motionTarget (const Setpoint& s) {
     LPC_TMR32B0->MR3 = ~0; // set timer count to max, so it won't change now
     
-    // determine step position to end on, rounding from a 24.8 to a 24.0 int
-    int endStep = (s.position * motion.params.posFactor + 128) / 256;
+    // determine target step to end on, rounding from a 24.8 to a 24.0 int
+    int target = posToStep(s.position);
     if (s.relative)
-        endStep += currentStep();
+        target += currentStep();
     
-    if (endStep < motion.params.minPos)
-        endStep = motion.params.minPos;
-    else if (endStep > motion.params.maxPos)
-        endStep = motion.params.maxPos;
+    // enforce soft position limits
+    if (target < posToStep(motion.params.minPos))
+        target = posToStep(motion.params.minPos);
+    if (target > posToStep(motion.params.maxPos))
+        target = posToStep(motion.params.maxPos);
     
-    int stepDiff = endStep - currentStep();
+    // set the next target
+    int stepDiff = target - currentStep();
     motion.direction = stepDiff > 0 ? 1 : -1;
     motion.stepsToGo = stepDiff * motion.direction;
-    motion.targetStep = endStep;
+    motion.targetStep = target;
 
     if (motion.stepsToGo > 0) {
         uint32_t clocks = MHZ * 1000L * s.time + motion.residue;
