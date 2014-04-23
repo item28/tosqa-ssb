@@ -32,13 +32,13 @@ typedef struct {
 
 // defined in included files below
 static void canBusInit ();
-static void canBusStart (int addr);
 static void motionInit ();
 static void motionParams (const MotionParams& p);
 static void motionTarget (const Setpoint& s);
 static void motionStop ();
 static void setpointInit ();
 static void setpointAdd (const Setpoint& s);
+static void setpointReset ();
 static void blinkerInit ();
 
 #include "blinker.cpp"
@@ -49,23 +49,36 @@ static void blinkerInit ();
 static void processIncomingRequest () {
     if (canBus.rxMessage.dlc == 8) {
         const void* p = canBus.rxMessage.data;
-        switch (canBus.rxMessage.mode_id & 0x07) {
+        switch (canBus.rxMessage.mode_id & 0x03) {
             case 0:
                 motionParams(*(const MotionParams*) p);
                 break;
             case 1:
                 setpointAdd(*(const Setpoint*) p);
                 break;
+            case 2:
+                break; // unused
+            case 3:
+                switch (canBus.rxMessage.data[0]) {
+                    case 0: // abort
+                        motionStop();
+                        setpointReset();
+                        break;
+                }
+                break;
         }
     }
 }
 
 static void reportQueueAvail (int slots) {
+    if (canBus.shortId == 0)
+        return; // no assigned ID, can't send report packets out
     CCAN_MSG_OBJ_T txMsg;
     txMsg.msgobj = 10;
-    txMsg.mode_id = 0x720;
-    txMsg.dlc = 1;
+    txMsg.mode_id = 0x400 | (canBus.shortId << 3);
+    txMsg.dlc = 2;
     txMsg.data[0] = slots;
+    txMsg.data[1] = 0; // TODO: status and mode info
     LPC_CCAN_API->can_transmit(&txMsg);
 }
 
@@ -76,8 +89,6 @@ int main () {
     motionInit();
     setpointInit();
     blinkerInit();
-    
-    canBusStart(0x420); // listen to address range 0x420..7
 
     #if 1
         static Setpoint sp;

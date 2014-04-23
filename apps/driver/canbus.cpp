@@ -16,16 +16,19 @@ static struct {
     int            rxOverruns;
     int            errorCount;
     uint32_t       myUid [4];
+    int            shortId;
 } canBus;
 
-// configure message object 1 to receive all 11-bit messages addr..addr+3
+// configure message object 1 to receive all CAN bus messages addr..addr+3
 static void listenAddressRange (int addr) {
-    if (addr >= 0x400)
-        addr |= CAN_MSGOBJ_EXT;
     CCAN_MSG_OBJ_T msgObj;
     msgObj.msgobj = 1;
     msgObj.mode_id = addr;
     msgObj.mask = 0x7FC;
+    // if (addr >= 0x800) {
+    //     msgObj.mode_id |= CAN_MSGOBJ_EXT;
+    //     msgObj.mask = 0x1FFFFFFC;
+    // }
     LPC_CCAN_API->config_rxmsgobj(&msgObj);
 }
 
@@ -43,12 +46,15 @@ static void CAN_rxCallback (uint8_t msg_obj_num) {
                 ++canBus.rxOverruns; // rx packet lost, no room in msg queue
             chSysUnlockFromIsr();
             break;
-        case 2: // listen address change request
+        case 2: // listen for short id assignments from the boot master
             // if uid matches, adjust listening address range as instructed
-            // the lower 8 bits of the msg id are bits 10..3 to listen to
-            // this uses extended addressing, so there are enough spare bits
-            if (msgObj.dlc == 8 && memcmp(msgObj.data, canBus.myUid, 8) == 0)
-                listenAddressRange((msgObj.mode_id & 0xFF) << 3);
+            // the lower 7 bits of the msg id are bits 9..3 to listen to
+        if (msgObj.dlc == 8 && memcmp(msgObj.data, canBus.myUid, 8) == 0) {
+                canBus.shortId = msgObj.mode_id & 0x7F;
+                // bit 10 = 0 for outgoing queue fill reports
+                // bit 10 = 1 for incoming setpoints and other requests
+                listenAddressRange(0x400 | (canBus.shortId << 3));
+            }
             break;
         default:
             ++canBus.errorCount;
@@ -109,10 +115,6 @@ void canBusInit () {
     LPC_CCAN_API->init_can(clkInitTable, true);
     LPC_CCAN_API->config_calb(&callbacks);
     NVIC_EnableIRQ(CAN_IRQn);
-}
-
-void canBusStart (int addr) {
-    listenAddressRange(addr);
 
     // configure msg object 2 to receive message address range 0x1F123400..7F
     CCAN_MSG_OBJ_T msgObj;    

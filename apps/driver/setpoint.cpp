@@ -52,7 +52,7 @@ static msg_t stepperTh (void*) {
     return 0;
 }
 
-static void setpointInit () {
+void setpointInit () {
     // make sure there is always at least one unused entry in setpoints[]
     chMBInit(&setpoint.mailbox, setpoint.buffer, SETPOINT_QUEUE_SIZE-1);
     // launch the stepper background thread
@@ -60,7 +60,7 @@ static void setpointInit () {
 }
 
 // add a next setpoint for the stepper to go to, will wait if queue is full
-static void setpointAdd (const Setpoint& s) {
+void setpointAdd (const Setpoint& s) {
     for (int i = 0; i < SETPOINT_QUEUE_SIZE; ++i)
         if (!isInUse(i)) {
             setInUse(i);
@@ -69,4 +69,9 @@ static void setpointAdd (const Setpoint& s) {
             return;
         }
     // never reached
+}
+
+void setpointReset () {
+    chMBReset(&setpoint.mailbox);
+    memset(setpoint.inUse, 0, sizeof setpoint.inUse);
 }
