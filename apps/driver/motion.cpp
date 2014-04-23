@@ -13,9 +13,10 @@ static struct {
 
 extern "C" void Vector88 (); // CT32B0
 CH_FAST_IRQ_HANDLER(Vector88)  {
-    LPC_TMR32B0->IR = LPC_TMR32B0->IR;  // clear all interrupts for this timer
+    LPC_TMR32B0->IR = LPC_TMR32B0->IR;      // clear interrupts for this timer
+    LPC_TMR32B0->EMR &= ~(1<<3);            // clear output pin manually
     if (--motion.stepsToGo == 0)
-      LPC_TMR32B0->MR3 = ~0; // set timer count to max, but don't stop it
+      LPC_TMR32B0->MR3 = ~0;                // timer count to max, don't stop
 }
 
 void motionInit () {
@@ -29,7 +30,7 @@ void motionInit () {
     LPC_IOCON->R_PIO0_11 = 0xD3;            // MOTOR_STEP, CT32B0_MAT3
     LPC_SYSCON->SYSAHBCLKCTRL |= 1<<9;      // enable clock for CT32B0
     LPC_TMR32B0->MCR |= (1<<9) | (1<<10);   // MR3I + MR3R, p.366
-    LPC_TMR32B0->PWMC = 1<<3;               // pwm enable, p.372
+    LPC_TMR32B0->EMR = 2<<10;               // set output pin on match
 
     nvicEnableVector(TIMER_32_0_IRQn, LPC11xx_PWM_CT32B0_IRQ_PRIORITY);
 }
@@ -83,11 +84,12 @@ void motionTarget (const Setpoint& s) {
     
         if (rate < MHZ * 10)                // enforce a soft timer rate limit
             rate = MHZ * 10;                // at least 10 µs, i.e. max 100 KHz
+        // TODO: could check that rate > TC, i.e. no overrun has occurred
         LPC_TMR32B0->MR3 = rate;
 
         palWritePad(GPIO1, GPIO1_MOTOR_DIR, stepDiff > 0 ? 1 : 0);
         palClearPad(GPIO3, GPIO3_MOTOR_EN); // active low, on
-        LPC_TMR32B0->TCR = 1;               // start timer, if not running
+        LPC_TMR32B0->TCR = 1;               // start timer if it wasn't running
 
         while (motion.stepsToGo > 0)        // move!
             chThdYield();                   // uses idle polling
@@ -105,7 +107,7 @@ void motionStop () {
     Setpoint next;
     next.time = 1;          // stop as soon as possible
     next.position = 0;      // request to stop on current pos
-    next.relative = 1;      // ... by specifying a relative motion of zero
+    next.relative = 1;      // by specifying zero relative motion
     next.velocity = 0;      // ends with stepper not moving
     motionTarget(next);
 }
