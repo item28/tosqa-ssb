@@ -8,9 +8,9 @@
 // internal state
 static struct {
     Mailbox     mailbox;
-    msg_t       buffer [SETPOINT_QUEUE_SIZE-1];
-    Setpoint    setpoints [SETPOINT_QUEUE_SIZE];
-    uint8_t     inUse [(SETPOINT_QUEUE_SIZE + 7)/8]; // 1 bit per entry
+    msg_t       buffer [SETPOINT_QUEUE_SIZE];
+    Setpoint    setpoints [SETPOINT_QUEUE_SIZE+1];
+    uint8_t     inUse [SETPOINT_QUEUE_SIZE/8+1]; // 1 bit per entry
 } setpoint;
 
 static bool isInUse (uint32_t n) {
@@ -54,7 +54,7 @@ static msg_t stepperTh (void*) {
 
 void setpointInit () {
     // make sure there is always at least one unused entry in setpoints[]
-    chMBInit(&setpoint.mailbox, setpoint.buffer, SETPOINT_QUEUE_SIZE-1);
+    chMBInit(&setpoint.mailbox, setpoint.buffer, SETPOINT_QUEUE_SIZE);
     // launch the stepper background thread
     chThdCreateStatic(waStepperTh, sizeof(waStepperTh), NORMALPRIO, stepperTh, 0);
 }
@@ -62,7 +62,7 @@ void setpointInit () {
 // add a next setpoint for the stepper to go to, will wait if queue is full
 void setpointAdd (const Setpoint& s) {
     // TODO: silly approach, should use first/last indices into circular buffer
-    for (int i = 0; i < SETPOINT_QUEUE_SIZE; ++i)
+    for (int i = 0; i <= SETPOINT_QUEUE_SIZE; ++i)
         if (!isInUse(i)) {
             setInUse(i);
             setpoint.setpoints[i] = s;
