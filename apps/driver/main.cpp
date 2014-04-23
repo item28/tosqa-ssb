@@ -35,6 +35,7 @@ static void canBusInit ();
 static void motionInit ();
 static void motionParams (const MotionParams& p);
 static void motionTarget (const Setpoint& s);
+static uint8_t motionStatus ();
 static void motionStop ();
 static void setpointInit ();
 static void setpointAdd (const Setpoint& s);
@@ -66,15 +67,15 @@ static void processIncomingRequest () {
     }
 }
 
-static void reportQueueAvail (int slots) {
+static void reportQueueAndStatus () {
     if (canBus.shortId == 0)
         return; // no assigned ID, can't send report packets out
     CCAN_MSG_OBJ_T txMsg;
     txMsg.msgobj = 10;
     txMsg.mode_id = 0x100 | canBus.shortId;
     txMsg.dlc = 2;
-    txMsg.data[0] = slots;
-    txMsg.data[1] = 0; // TODO: status and mode info
+    txMsg.data[0] = chMBGetFreeCountI(&setpoint.mailbox);
+    txMsg.data[1] = motionStatus();
     LPC_CCAN_API->can_transmit(&txMsg);
 }
 
@@ -101,22 +102,17 @@ int main () {
         setpointAdd(sp);
     #endif
     
-    bool sendSlotCount = true;
+    int sendRate = 100;
     for (;;) {
         msg_t rxMsg;
-        switch (chMBFetch(&canBus.rxPending, &rxMsg, 100)) {
-            case RDY_OK:
-                // process each CAN bus message as it comes in via the mailbox
-                processIncomingRequest();
-                sendSlotCount = true; // report at least once
-                break;
-            case RDY_TIMEOUT:
-                // report queue free after incoming msgs, until queue is empty
-                if (sendSlotCount) {
-                    reportQueueAvail(chMBGetFreeCountI(&setpoint.mailbox));
-                    sendSlotCount = chMBGetUsedCountI(&setpoint.mailbox) > 0;
-                }
-                break;
+        msg_t ok = chMBFetch(&canBus.rxPending, &rxMsg, sendRate);
+        sendRate = 100; // the default is to report again soon
+        if (ok == RDY_OK)
+            processIncomingRequest();
+        else {
+            reportQueueAndStatus();
+            if (chMBGetUsedCountI(&setpoint.mailbox) <= 0)
+                sendRate = 1000; // no activity, report less often
         }
     }
 

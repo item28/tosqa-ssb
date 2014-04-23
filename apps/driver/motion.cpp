@@ -1,7 +1,8 @@
 // motion code, this is the low-level timer/pwm stepping stuff
-// TODO: velocity is ignored, only linear stepping for now
+// TODO: velocity is ignored, only linear position/time stepping for now
 
-#define MHZ 48  // timer clock rate, i.e. use system clock w/o prescaler
+#define MHZ   48    // timer clock rate, i.e. use system clock w/o prescaler
+#define USPT  1000  // microseconds per time given in the setpoint, max 1000
 
 static struct {
     MotionParams      params;     // motor limits
@@ -9,20 +10,24 @@ static struct {
     int               direction;  // +1 if forward, -1 if backward
     volatile uint32_t stepsToGo;  // steps to go, drops to zero when done
     int               residue;    // timer rate error, in clock cycles
+    int               errors;     // error flags, cleared in motionStatus
 } motion;
+
+// motion error and status bits
+enum { F_TOOFAST, F_HITMIN, F_HITMAX, F_MOVING, F_POWERED };
 
 extern "C" void Vector88 (); // CT32B0
 CH_FAST_IRQ_HANDLER(Vector88)  {
     LPC_TMR32B0->IR = LPC_TMR32B0->IR;      // clear interrupts for this timer
     LPC_TMR32B0->EMR &= ~(1<<3);            // clear output pin manually
     if (--motion.stepsToGo == 0)
-        LPC_TMR32B0->MR3 = ~0;              // timer count to max, don't stop
+        LPC_TMR32B0->MR3 = ~0;              // slow down the timer, don't stop
 }
 
 void motionInit () {
     // set the static stepper I/O pins to a default state
-    palSetPad(GPIO3, GPIO3_MOTOR_SLEEP);    // active low, disabled
-    palSetPad(GPIO1, GPIO1_MOTOR_RESET);    // active low, disabled
+    palSetPad(GPIO3, GPIO3_MOTOR_SLEEP);    // active low, off
+    palSetPad(GPIO1, GPIO1_MOTOR_RESET);    // active low, off
     palSetPad(GPIO3, GPIO3_MOTOR_EN);       // active low, off
     
     motionParams(motion.params);            // initialise to sane values
@@ -73,10 +78,14 @@ void motionTarget (const Setpoint& s) {
         target += currentStep();
     
     // enforce soft position limits
-    if (target < posToStep(motion.params.minPos))
+    if (target < posToStep(motion.params.minPos)) {
         target = posToStep(motion.params.minPos);
-    if (target > posToStep(motion.params.maxPos))
+        motion.errors |= 1<<F_HITMIN;       // bumped into min position limit
+    }
+    if (target > posToStep(motion.params.maxPos)) {
         target = posToStep(motion.params.maxPos);
+        motion.errors |= 1<<F_HITMAX;       // bumped into max position limit
+    }
     
     // set the next target
     int stepDiff = target - currentStep();
@@ -85,12 +94,14 @@ void motionTarget (const Setpoint& s) {
     motion.targetStep = target;
 
     if (motion.stepsToGo > 0) {
-        uint32_t clocks = MHZ * 1000L * s.time + motion.residue;
+        uint32_t clocks = MHZ * USPT * s.time + motion.residue;
         uint32_t rate = (clocks + motion.stepsToGo / 2) / motion.stepsToGo;
         motion.residue = clocks - rate * motion.stepsToGo;
     
-        if (rate < MHZ * 10)                // enforce a soft timer rate limit
+        if (rate < MHZ * 10) {              // enforce a soft timer rate limit
             rate = MHZ * 10;                // at least 10 µs, i.e. max 100 KHz
+            motion.errors |= 1<<F_TOOFAST;  // rate limiting took place
+        }
         // TODO: could check that rate > TC, i.e. no overrun has occurred
         LPC_TMR32B0->MR3 = rate;
 
@@ -117,4 +128,15 @@ void motionStop () {
     next.relative = 1;      // by specifying zero relative motion
     next.velocity = 0;      // ends with stepper not moving
     motionTarget(next);
+}
+
+// report the current motion status, then clear all errors
+uint8_t motionStatus () {
+  uint8_t status = motion.errors;
+  motion.errors = 0;
+  if (motion.stepsToGo > 0)
+    status |= 1<<F_MOVING;
+  if (!palReadPad(GPIO3, GPIO3_MOTOR_EN))   // active low
+    status |= 1<<F_POWERED;
+  return status;
 }
