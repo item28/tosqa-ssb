@@ -1,19 +1,21 @@
 // motion code, this is the low-level timer/pwm stepping stuff
 // TODO: velocity is ignored, only linear stepping for now
 
-#define MHZ 48  // timer rate, same as system clock w/o prescaler
+#define MHZ 48  // timer clock rate, i.e. use system clock w/o prescaler
 
 static struct {
-    MotionParams params;    // motor limits
-    int          ssTarget;  // where the stepper needs to go, in sub-steps
-    int          direction; // +1 if forward, -1 if backward
-    volatile int ssToGo;    // sub-steps to go, drops to <= 0 when done
+    MotionParams      params;     // motor limits
+    int               targetStep; // where the stepper needs to go, in steps
+    int               direction;  // +1 if forward, -1 if backward
+    volatile uint32_t stepsToGo;  // steps to go, drops to zero when done
+    int               residue;    // timer rate error, in clock cycles
 } motion;
 
 extern "C" void Vector88 (); // CT32B0
 CH_FAST_IRQ_HANDLER(Vector88)  {
     LPC_TMR32B0->IR = LPC_TMR32B0->IR;  // clear all interrupts for this timer
-    motion.ssToGo -= 256;               // move in real, not fractional, steps
+    if (--motion.stepsToGo == 0)
+      LPC_TMR32B0->MR3 = ~0; // set timer count to max, but don't stop it
 }
 
 void motionInit () {
@@ -32,10 +34,10 @@ void motionInit () {
     nvicEnableVector(TIMER_32_0_IRQn, LPC11xx_PWM_CT32B0_IRQ_PRIORITY);
 }
 
-// return the current position of the stepper motor in sub-steps (steps * 256)
-static int currentSubStep () {
+// return the current position of the stepper motor in steps
+static int currentStep () {
     // if there are still steps to go, then target position hasn't been reached
-    return motion.ssTarget - motion.direction * motion.ssToGo;
+    return motion.targetStep - motion.direction * motion.stepsToGo;
 }
 
 // set the motion configuration parameters
@@ -43,7 +45,7 @@ void motionParams (const MotionParams& p) {
     motion.params = p;
 
     if (motion.params.posFactor == 0)
-        motion.params.posFactor = 1 << 8;
+        motion.params.posFactor = 256; // 1.0 as 24.8
     if (motion.params.maxPos <= motion.params.minPos) {
         motion.params.minPos = -32768;
         motion.params.maxPos = 32767;
@@ -57,38 +59,42 @@ void motionParams (const MotionParams& p) {
 
 // move to the given setpoint
 void motionTarget (const Setpoint& s) {
-    LPC_TMR32B0->TCR = 0; // stop interrupts so ssToGo won't change
+    LPC_TMR32B0->MR3 = ~0; // set timer count to max, so it won't change now
     
-    int ssEndPos = s.position * motion.params.posFactor;
+    // determine step position to end on, rounding from a 24.8 to a 24.0 int
+    int endStep = (s.position * motion.params.posFactor + 128) / 256;
     if (s.relative)
-        ssEndPos += currentSubStep();
+        endStep += currentStep();
     
-    if (ssEndPos < motion.params.minPos * motion.params.posFactor)
-        ssEndPos = motion.params.minPos * motion.params.posFactor;
-    else if (ssEndPos > motion.params.maxPos * motion.params.posFactor)
-        ssEndPos = motion.params.maxPos * motion.params.posFactor;
+    if (endStep < motion.params.minPos)
+        endStep = motion.params.minPos;
+    else if (endStep > motion.params.maxPos)
+        endStep = motion.params.maxPos;
     
-    int ssDiff = ssEndPos - currentSubStep();
-    motion.direction = ssDiff > 0 ? 1 : -1;
-    motion.ssToGo = ssDiff * motion.direction;
-    motion.ssTarget = ssEndPos;
+    int stepDiff = endStep - currentStep();
+    motion.direction = stepDiff > 0 ? 1 : -1;
+    motion.stepsToGo = stepDiff * motion.direction;
+    motion.targetStep = endStep;
 
-    if (ssDiff != 0) {
-        // use 64-bit by 32-bit division to get max accuracy without overflow
-        // this will add 2 KB to the code size...
-        uint32_t rate = (MHZ * 1000LL * s.time * 256 + 128) / motion.ssToGo;
-        if (rate < MHZ * 10)
+    if (motion.stepsToGo > 0) {
+        uint32_t clocks = MHZ * 1000L * s.time + motion.residue;
+        uint32_t rate = (clocks + motion.stepsToGo / 2) / motion.stepsToGo;
+        motion.residue = clocks - rate * motion.stepsToGo;
+    
+        if (rate < MHZ * 10)                // enforce a soft timer rate limit
             rate = MHZ * 10;                // at least 10 µs, i.e. max 100 KHz
         LPC_TMR32B0->MR3 = rate;
-    
-        palWritePad(GPIO1, GPIO1_MOTOR_DIR, ssDiff > 0 ? 1 : 0);
-        palClearPad(GPIO3, GPIO3_MOTOR_EN); // active low, on
-        LPC_TMR32B0->TCR = 1;               // start timer
 
-        while (motion.ssToGo > 0)           // move!
+        palWritePad(GPIO1, GPIO1_MOTOR_DIR, stepDiff > 0 ? 1 : 0);
+        palClearPad(GPIO3, GPIO3_MOTOR_EN); // active low, on
+        LPC_TMR32B0->TCR = 1;               // start timer, if not running
+
+        while (motion.stepsToGo > 0)        // move!
             chThdYield();                   // uses idle polling
-    } else if (s.time > 0)
+    } else if (s.time > 0) {
+        LPC_TMR32B0->TCR = 0;               // stop timer
         chThdSleepMilliseconds(s.time);     // dwell
+    }
 
     if (s.velocity == 0)
         palSetPad(GPIO3, GPIO3_MOTOR_EN);   // active low, off

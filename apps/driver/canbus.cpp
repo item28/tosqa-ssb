@@ -18,14 +18,14 @@ static struct {
     uint32_t       myUid [4];
 } canBus;
 
-// configure message object 1 to receive all 11-bit messages addr..addr+7
+// configure message object 1 to receive all 11-bit messages addr..addr+3
 static void listenAddressRange (int addr) {
     if (addr >= 0x400)
         addr |= CAN_MSGOBJ_EXT;
     CCAN_MSG_OBJ_T msgObj;
     msgObj.msgobj = 1;
     msgObj.mode_id = addr;
-    msgObj.mask = 0x7F8;
+    msgObj.mask = 0x7FC;
     LPC_CCAN_API->config_rxmsgobj(&msgObj);
 }
 
