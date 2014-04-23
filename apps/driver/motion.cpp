@@ -2,7 +2,7 @@
 // TODO: velocity is ignored, only linear position/time stepping for now
 
 #define MHZ   48    // timer clock rate, i.e. use system clock w/o prescaler
-#define USPT  1000  // microseconds per time given in the setpoint, max 1000
+#define USPT  125   // microseconds per time unit in the setpoint, max 1000
 
 static struct {
     MotionParams      params;     // motor limits
@@ -132,11 +132,11 @@ void motionStop () {
 
 // report the current motion status, then clear all errors
 uint8_t motionStatus () {
-  uint8_t status = motion.errors;
-  motion.errors = 0;
-  if (motion.stepsToGo > 0)
-    status |= 1<<F_MOVING;
-  if (!palReadPad(GPIO3, GPIO3_MOTOR_EN))   // active low
-    status |= 1<<F_POWERED;
-  return status;
+    uint8_t status = motion.errors;
+    motion.errors = 0;
+    if (motion.stepsToGo > 0)
+        status |= 1<<F_MOVING;
+    if (!palReadPad(GPIO3, GPIO3_MOTOR_EN))   // active low
+        status |= 1<<F_POWERED;
+    return status;
 }

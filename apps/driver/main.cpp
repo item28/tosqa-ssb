@@ -89,14 +89,14 @@ int main () {
 
     #if 1
         static Setpoint sp;
-        sp.time = 2000;
+        sp.time = 2000*8;   // 2000 ms
         sp.position = 200;  // 10 ms/step
         sp.velocity = 1;
         setpointAdd(sp);
-        sp.time = 500;
+        sp.time = 500*8;    // 500 ms
         sp.position = 100;  // 5 ms/step
         setpointAdd(sp);
-        sp.time = 1000;
+        sp.time = 1000*8;   // 1000 ms
         sp.position = -500; // 2 ms/step
         sp.relative = 1;
         setpointAdd(sp);
@@ -106,7 +106,7 @@ int main () {
     for (;;) {
         msg_t rxMsg;
         msg_t ok = chMBFetch(&canBus.rxPending, &rxMsg, sendRate);
-        sendRate = 100; // the default is to report again soon
+        sendRate = 100; // the default is to report again in 100 ms
         if (ok == RDY_OK)
             processIncomingRequest();
         else {

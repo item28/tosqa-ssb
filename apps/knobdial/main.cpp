@@ -50,7 +50,7 @@ typedef struct {
 
 static void sendSetPoint(int id, int ms, int pos) {
     static Setpoint sp;
-    sp.time = ms;
+    sp.time = ms * 8; // time steps are in multiples of 125 µs
     sp.position = pos;
     sp.relative = 1;
     sp.velocity = 1;
@@ -73,9 +73,9 @@ int main () {
 
     for (;;) {
         // TODO: no rotary switches yet, run a simulation instead
-        sendSetPoint(1, 1000, 100);
-        sendSetPoint(1, 500, -100);
-        sendSetPoint(1, 500, 100);
+        sendSetPoint(1, 1000,  100);
+        sendSetPoint(1,  500, -100);
+        sendSetPoint(1,  500,  100);
         sendSetPoint(1, 1000, -100);
 
         chThdSleepMilliseconds(2000);
