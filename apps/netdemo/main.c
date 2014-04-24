@@ -26,35 +26,16 @@
 #include "ff.h"
 #include "evtimer.h"
 
-/*===========================================================================*/
-/* Card insertion monitor.                                                   */
-/*===========================================================================*/
+// Card insertion monitor
 
 #define POLLING_INTERVAL                10
 #define POLLING_DELAY                   10
 
-/**
- * @brief   Card monitor timer.
- */
-static VirtualTimer tmr;
+static VirtualTimer tmr;  // Card monitor timer.
+static unsigned cnt;      // Debounce counter.
+static EventSource inserted_event, removed_event; // Card event sources.
 
-/**
- * @brief   Debounce counter.
- */
-static unsigned cnt;
-
-/**
- * @brief   Card event sources.
- */
-static EventSource inserted_event, removed_event;
-
-/**
- * @brief   Insertion monitor timer callback function.
- *
- * @param[in] p         pointer to the @p BaseBlockDevice object
- *
- * @notapi
- */
+// Insertion monitor timer callback function.
 static void tmrfunc(void *p) {
   BaseBlockDevice *bbdp = p;
 
@@ -86,15 +67,8 @@ static void tmrfunc(void *p) {
   chSysUnlockFromIsr();
 }
 
-/**
- * @brief   Polling monitor start.
- *
- * @param[in] p         pointer to an object implementing @p BaseBlockDevice
- *
- * @notapi
- */
+// Polling monitor start.
 static void tmr_init(void *p) {
-
   chEvtInit(&inserted_event);
   chEvtInit(&removed_event);
   chSysLock();
@@ -103,7 +77,6 @@ static void tmr_init(void *p) {
   chSysUnlock();
 }
 
-/* Board-related functions related to the MMC_SPI driver.*/
 bool_t mmc_lld_is_card_inserted(MMCDriver *mmcp) {
   (void)mmcp;
   return !palReadPad(GPIO0, GPIO0_MMC_CD);
@@ -114,22 +87,11 @@ bool_t mmc_lld_is_write_protected(MMCDriver *mmcp) {
   return 0; // palReadPad(IOPORT2, PB_WP1);
 }
 
-/*===========================================================================*/
-/* FatFs related.                                                            */
-/*===========================================================================*/
+// FatFs related
 
-/**
- * @brief FS object.
- */
-FATFS MMC_FS;
-
-/**
- * MMC driver instance.
- */
-MMCDriver MMCD1;
-
-/* FS mounted and ready.*/
-static bool_t fs_ready = FALSE;
+FATFS MMC_FS;     // FS object.
+MMCDriver MMCD1;  // MMC driver instance.
+static bool_t fs_ready = FALSE; // FS mounted and ready
 
 /* Maximum speed SPI configuration (18MHz, CPHA=0, CPOL=0).*/
 static SPIConfig hs_spicfg = {
@@ -192,18 +154,15 @@ static FRESULT scan_files(BaseSequentialStream *chp, char *path) {
   return res;
 }
 
-/*===========================================================================*/
-/* Command line related.                                                     */
-/*===========================================================================*/
+// Command line related
 
 #define SHELL_WA_SIZE   THD_WA_SIZE(1024)
 #define TEST_WA_SIZE    THD_WA_SIZE(256)
 
 BaseSequentialStream* chp1 = (BaseSequentialStream*) &SD1;
 
-/*
- * Red LED blinker thread, times are in milliseconds.
- */
+// Red LED blinker thread, times are in milliseconds.
+
 static WORKING_AREA(waBlinker, 64);
 static msg_t blinker (void *arg) {
   (void)arg;
@@ -214,19 +173,6 @@ static msg_t blinker (void *arg) {
   }
   return 0;
 }
-
-// static void cmd_pwrdown(BaseSequentialStream *chp, int argc, char*argv[]){
-//   (void)argv;
-//   if (argc > 0) {
-//     chprintf(chp, "Usage: pwrdown\r\n");
-//     return;
-//   }
-//   chprintf(chp, "Going to power down.\r\n");
-//   chThdSleepMilliseconds(200);
-//   chSysLock();
-//   LPC_SC->PCON |= 0x03; // set PM0 and PM1
-//   __WFI();
-// }
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
   size_t n, size;
@@ -306,11 +252,9 @@ static void cmd_tree(BaseSequentialStream *chp, int argc, char *argv[]) {
   scan_files(chp, (char *)fbuff);
 }
 
-/*
- * CAN transmitter thread.
- */
-static WORKING_AREA(can_tx_wa, 256);
+// CAN transmitter thread.
 
+static WORKING_AREA(can_tx_wa, 256);
 static msg_t can_tx(void * p) {
   (void)p;
   CANTxFrame txmsg_can1;
@@ -367,7 +311,6 @@ static msg_t can_tx(void * p) {
   return 0;
 }
 
-#if LPC17xx_CAN_USE_FILTER
 static const CANFilterExt cfe_id_table[2] = {
   CANFilterExtEntry(0, 0x1F123480),
   CANFilterExtEntry(0, 0x1F1234FF)
@@ -386,12 +329,8 @@ static const CANFilterConfig canfcfg = {
   cfe_id_table,
   2
 };
-#endif
 
-/*
- * CAN receiver thread.
- */
-static WORKING_AREA(can_rx_wa, 512);
+// CAN receiver thread.
 
 static uint8_t nodeMap[30][8];
 int nextNode = 1;
@@ -433,6 +372,7 @@ static bool_t sendFile (uint8_t dest, uint8_t id, uint8_t page) {
   return res == 0;
 }
 
+static WORKING_AREA(can_rx_wa, 512);
 static msg_t can_rx (void * p) {
   (void)p;
   CANRxFrame rxmsg;
@@ -474,9 +414,7 @@ static msg_t can_rx (void * p) {
   return 0;
 }
 
-/*
- * MMC card insertion event.
- */
+// MMC card insertion event.
 static void InsertHandler(eventid_t id) {
   FRESULT err;
 
@@ -506,9 +444,7 @@ static void InsertHandler(eventid_t id) {
   // buzzPlay(440, MS2ST(200));
 }
 
-/*
- * MMC card removal event.
- */
+// MMC card removal event.
 static void RemoveHandler(eventid_t id) {
 
   (void)id;
@@ -520,9 +456,7 @@ static void RemoveHandler(eventid_t id) {
   palSetPad(GPIO0, GPIO0_MMC_PWR);
 }
 
-/*
- * Application entry point.
- */
+// Application entry point.
 int main(void) {
   static const evhandler_t evhndl[] = {
     InsertHandler,
@@ -530,24 +464,14 @@ int main(void) {
   };
   struct EventListener el0, el1;
 
-  /*
-   * System initializations.
-   * - HAL initialization, this also initializes the configured device drivers
-   *   and performs the board-specific initializations.
-   * - Kernel initialization, the main() function becomes a thread and the
-   *   RTOS is active.
-   */
+  // System initializations.
   halInit();
   chSysInit();
 
-  /*
-   * Activates the serial driver 6 using the driver default configuration.
-   */
+  // Activates the serial driver 6 using the driver default configuration.
   sdStart(&SD1, NULL);
 
-  /*
-   * Activates CAN driver 1.
-   */
+  // Activates CAN driver 1.
   static const CANConfig cancfg = {
     0,
     CANBTR_SJW(0) | CANBTR_TESG2(1) |
@@ -555,45 +479,28 @@ int main(void) {
   };
   canStart(&CAND1, &cancfg);
 
-  /*
-   * Creates the blinker thread.
-   */
+  // Creates the blinker thread.
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
 
-  /*
-   * Creates the CAN transmit thread.
-   */
+  // Creates the CAN transmit thread.
   chThdCreateStatic(can_tx_wa, sizeof(can_tx_wa), NORMALPRIO, can_tx, NULL);
 
-#if LPC17xx_CAN_USE_FILTER
+  // Creates the CAN receive thread.
   canSetFilter(&canfcfg);
-#endif
-
-  /*
-   * Creates the CAN receive thread.
-   */
   chThdCreateStatic(can_rx_wa, sizeof(can_rx_wa), NORMALPRIO, can_rx, NULL);
 
-  /*
-   * Initializes the MMC driver to work with SSP1.
-   */
+  // Initializes the MMC driver to work with SSP1.
   mmcObjectInit(&MMCD1);
   mmcStart(&MMCD1, &mmccfg);
   
-  /*
-   * Activates the card insertion monitor.
-   */
+  // Activates the card insertion monitor.
   tmr_init(&MMCD1);
   
-  /*
-   * Creates the LWIP threads (it changes priority internally).
-   */
+  // Creates the LWIP threads (it changes priority internally).
   chThdCreateStatic(wa_lwip_thread, LWIP_THREAD_STACK_SIZE, NORMALPRIO + 1,
                     lwip_thread, NULL);
 
-  /*
-   * Creates the HTTP thread (it changes priority internally).
-   */
+  // Creates the HTTP thread (it changes priority internally).
   chThdCreateStatic(wa_http_server, sizeof(wa_http_server), NORMALPRIO + 1,
                     http_server, NULL);
 
@@ -612,15 +519,13 @@ int main(void) {
     (BaseSequentialStream  *)&SD1,
     commands
   };
-  /* Shell initialization.*/
+
+  // Shell initialization.
   shellInit();
   static WORKING_AREA(waShell, SHELL_WA_SIZE);
   shellCreateStatic(&shell_cfg1, waShell, sizeof(waShell), NORMALPRIO);
 
-  /*
-   * Normal main() thread activity, in this demo it does nothing except
-   * sleeping in a loop and listen for events.
-   */
+  // main loop - sleep in a loop and listen for events.
   chEvtRegister(&inserted_event, &el0, 0);
   chEvtRegister(&removed_event, &el1, 1);
   while (TRUE)
