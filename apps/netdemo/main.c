@@ -25,6 +25,8 @@
 #include "web/web.h"
 #include "ff.h"
 #include "evtimer.h"
+#include <lwip/api.h>
+#include <lwip/dhcp.h>
 
 // Card insertion monitor
 
@@ -456,8 +458,48 @@ static void RemoveHandler(eventid_t id) {
   palSetPad(GPIO0, GPIO0_MMC_PWR);
 }
 
+// CAN bridge
+
+#define CAN_BRIDGE_PORT     3531
+#define CAN_BRIDGE_PRIORITY (LOWPRIO + 2)
+
+static void canBridge_serve (struct netconn *conn) {
+  struct netbuf *inbuf;
+  err_t err = netconn_recv(conn, &inbuf);
+  if (err == ERR_OK) {
+    char *buf;
+    u16_t buflen;
+    netbuf_data(inbuf, (void **)&buf, &buflen);
+    netconn_write(conn, buf, buflen, NETCONN_NOCOPY);
+    netconn_write(conn, "?\r\n", 3, NETCONN_NOCOPY);
+  }
+  netconn_close(conn);
+  netbuf_delete(inbuf);
+}
+
+WORKING_AREA(wa_canBridge, 1024);
+msg_t canBridge (void *p) {
+  (void)p;
+
+  struct netconn *conn = netconn_new(NETCONN_TCP);
+  LWIP_ERROR("canBridge: invalid conn", (conn != NULL), return RDY_RESET;);
+  netconn_bind(conn, NULL, CAN_BRIDGE_PORT);
+  netconn_listen(conn);
+  chThdSetPriority(CAN_BRIDGE_PRIORITY);
+
+  while(1) {
+    struct netconn *newconn;
+    err_t err = netconn_accept(conn, &newconn);
+    if (err != ERR_OK)
+      continue;
+    canBridge_serve(newconn);
+    netconn_delete(newconn);
+  }
+  return RDY_OK;
+}
+
 // Application entry point.
-int main(void) {
+int main (void) {
   static const evhandler_t evhndl[] = {
     InsertHandler,
     RemoveHandler
@@ -500,9 +542,17 @@ int main(void) {
   chThdCreateStatic(wa_lwip_thread, LWIP_THREAD_STACK_SIZE, NORMALPRIO + 1,
                     lwip_thread, NULL);
 
+  // not working yet:
+  // chThdSleepMilliseconds(50); // make sure lwip has started
+  // dhcp_start(netif_default);
+
   // Creates the HTTP thread (it changes priority internally).
   chThdCreateStatic(wa_http_server, sizeof(wa_http_server), NORMALPRIO + 1,
                     http_server, NULL);
+
+  // Creates the CAN bridge thread (it changes priority internally).
+  chThdCreateStatic(wa_canBridge, sizeof(wa_canBridge), NORMALPRIO + 1,
+                    canBridge, NULL);
 
   chprintf(chp1, "\r\n[netdemo]\r\n");
 
