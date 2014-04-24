@@ -28,6 +28,8 @@
 #include <lwip/api.h>
 #include <lwip/dhcp.h>
 
+static const char* greet = "\r\n[netdemo]\r\n";
+
 // Card insertion monitor
 
 #define POLLING_INTERVAL                10
@@ -35,7 +37,10 @@
 
 static VirtualTimer tmr;  // Card monitor timer.
 static unsigned cnt;      // Debounce counter.
-static EventSource inserted_event, removed_event; // Card event sources.
+static EventSource inserted_event, removed_event;   // Card event sources.
+
+static void canToBridge (const CANRxFrame* rxMsg);  // forward decl
+static void echoToBridge (const CANTxFrame* txMsg); // forward decl
 
 // Insertion monitor timer callback function.
 static void tmrfunc(void *p) {
@@ -309,26 +314,32 @@ static msg_t can_tx(void * p) {
       txmsg_can1.DLC = 0;
     }
     canTransmit(&CAND1, 1, &txmsg_can1, 100);
+    echoToBridge(&txmsg_can1);
   }
   return 0;
 }
 
-static const CANFilterExt cfe_id_table[2] = {
-  CANFilterExtEntry(0, 0x1F123480),
-  CANFilterExtEntry(0, 0x1F1234FF)
+static const CANFilterStdRange cfe_sid_table[1] = {
+  // bug in can_lld.h: CANFilterStdRangeEntry(0, 0, 0x000, 0, 0, 0x7FF)
+  CANFilterStdEntry(0, 0, 0x000, 0, 0, 0x7FF)
+};
+
+static const CANFilterExtRange cfe_eid_table[2] = {
+  CANFilterExtRangeEntry(0, 0x00000800),
+  CANFilterExtRangeEntry(0, 0x1FFFFFFF)
 };
 
 static const CANFilterConfig canfcfg = {
-  0,
+  AFMR_ACC_BP, // don't use any filtering
   NULL,
   0,
   NULL,
   0,
+  cfe_sid_table,
+  1,
   NULL,
   0,
-  NULL,
-  0,
-  cfe_id_table,
+  cfe_eid_table,
   2
 };
 
@@ -367,6 +378,7 @@ static bool_t sendFile (uint8_t dest, uint8_t id, uint8_t page) {
         break;
       memset(txmsg.data8 + count, 0xFF, 8 - count);
       canTransmit(&CAND1, 1, &txmsg, 100); // 1 mailbox, must send in-order!
+      // don't call echoToBridge for these bulk transfers
     }
   }
   
@@ -388,28 +400,31 @@ static msg_t can_rx (void * p) {
   chRegSetThreadName("receiver");
   while(!chThdShouldTerminate()) {
     while (canReceive(&CAND1, CAN_ANY_MAILBOX, &rxmsg, 100) == RDY_OK) {
-      /* Process message.*/
-      if (rxmsg.DLC == 8) {
-        int i = 0;
-        while (i < nextNode)
-          if (memcmp(nodeMap[i], rxmsg.data8, 8) == 0)
-            break;
-          else
-            ++i;
-        if (i >= nextNode)
-          memcpy(nodeMap[nextNode++], rxmsg.data8, 8);
-        chprintf(chp1, "\r\nCAN  ann %08x: %08x %08x -> %d\r\n",
-                        rxmsg.EID, rxmsg.data32[0], rxmsg.data32[1], i);
-        txmsg.EID = 0x1F123400 + i;
-        memcpy(txmsg.data8, rxmsg.data8, 8);
-        canTransmit(&CAND1, 1, &txmsg, 100);
-        // chThdSleepMilliseconds(1);
-      } else if (rxmsg.DLC == 2) {
-        uint8_t dest = rxmsg.data8[0], page = rxmsg.data8[1];
-        chprintf(chp1, "CAN boot %08x: %02x #%d ", rxmsg.EID, dest, page);
-        if (sendFile(dest, rxmsg.EID & 0x7F, page))
-          chprintf(chp1, " SENT");
-        chprintf(chp1, "\r\n");
+      canToBridge(&rxmsg);
+      /* Process message, with manual filtering */
+      if (rxmsg.IDE && (rxmsg.EID & 0x1FFFFF80) == 0x1F123480) {
+        if (rxmsg.DLC == 8) {
+          int i = 0;
+          while (i < nextNode)
+            if (memcmp(nodeMap[i], rxmsg.data8, 8) == 0)
+              break;
+            else
+              ++i;
+          if (i >= nextNode)
+            memcpy(nodeMap[nextNode++], rxmsg.data8, 8);
+          chprintf(chp1, "\r\nCAN  ann %08x: %08x %08x -> %d\r\n",
+                          rxmsg.EID, rxmsg.data32[0], rxmsg.data32[1], i);
+          txmsg.EID = 0x1F123400 + i;
+          memcpy(txmsg.data8, rxmsg.data8, 8);
+          canTransmit(&CAND1, 1, &txmsg, 100);
+          echoToBridge(&txmsg);
+        } else if (rxmsg.DLC == 2) {
+          uint8_t dest = rxmsg.data8[0], page = rxmsg.data8[1];
+          chprintf(chp1, "CAN boot %08x: %02x #%d ", rxmsg.EID, dest, page);
+          if (sendFile(dest, rxmsg.EID & 0x7F, page))
+            chprintf(chp1, " SENT");
+          chprintf(chp1, "\r\n");
+        }
       }
     }
   }
@@ -529,9 +544,12 @@ static void parseCanCmds (const char* buf, int len) {
   }
 }
 
+struct netconn *currConn;
+
 // telnet-like server, reads text commands from an open network connection
 static void canBridge_serve (struct netconn *conn) {
   struct netbuf *inbuf;
+  currConn = conn;
   for (;;) {
     err_t err = netconn_recv(conn, &inbuf);
     if (err != ERR_OK)
@@ -542,7 +560,44 @@ static void canBridge_serve (struct netconn *conn) {
     parseCanCmds(buf, buflen);
     netbuf_delete(inbuf);
   }
+  currConn = 0;
   netconn_close(conn);
+}
+
+static char* appendHex (char *p, uint8_t v) {
+  const char* hex = "0123456789ABCDEF";
+  *p++ = hex[v>>4];
+  *p++ = hex[v&0x0F];
+  return p;
+}
+
+// send incoming CAN message to current bridge session, if any
+static void canToBridge (const CANRxFrame* rxMsg) {
+  if (currConn != 0) {
+    char buf [30];
+    uint32_t id = rxMsg->EID;
+    if (!rxMsg->IDE)
+      id &= 0x7FF;
+    chsnprintf(buf, sizeof buf, "S%x#", id);
+    char* p = buf + strlen(buf);
+    int i;
+    for (i = 0; i < rxMsg->DLC; ++i)
+      p = appendHex(p, rxMsg->data8[i]);
+    strcpy(p, "\r\n");
+    netconn_write(currConn, buf, strlen(buf), NETCONN_COPY);
+  }
+}
+
+// hack to also report some messages sent to CAN
+static void echoToBridge (const CANTxFrame* txMsg) {
+  CANRxFrame rxMsg;
+  rxMsg.DLC = txMsg->DLC;
+  rxMsg.RTR = txMsg->RTR;
+  rxMsg.IDE = txMsg->IDE;
+  rxMsg.EID = txMsg->EID;
+  rxMsg.data32[0] = txMsg->data32[0];
+  rxMsg.data32[1] = txMsg->data32[1];
+  canToBridge(&rxMsg);
 }
 
 WORKING_AREA(wa_canBridge, 512);
@@ -561,6 +616,7 @@ msg_t canBridge (void *p) {
     err_t err = netconn_accept(conn, &newconn);
     if (err != ERR_OK)
       continue;
+    netconn_write(newconn, greet, strlen(greet), NETCONN_COPY);
     canBridge_serve(newconn);
     netconn_delete(newconn);
   }
@@ -623,7 +679,7 @@ int main (void) {
   chThdCreateStatic(wa_canBridge, sizeof(wa_canBridge), NORMALPRIO + 1,
                     canBridge, NULL);
 
-  chprintf(chp1, "\r\n[netdemo]\r\n");
+  chprintf(chp1, greet);
 
   static const ShellCommand commands[] = {
     // {"pwrdown", cmd_pwrdown},
