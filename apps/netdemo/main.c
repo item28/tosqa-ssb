@@ -463,23 +463,92 @@ static void RemoveHandler(eventid_t id) {
 #define CAN_BRIDGE_PORT     3531
 #define CAN_BRIDGE_PRIORITY (LOWPRIO + 2)
 
+static char canCmdBuf[50];
+static uint8_t canCmdFill;
+
+static uint32_t parseHexNum (void) {
+  uint32_t v = 0;
+  for (;;) {
+    char c = canCmdBuf[canCmdFill];
+    if (c > ' ') {
+      if (('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'))
+        c += 7;
+      else if (c < '0' || c > '9')
+        return v;
+      v = (v << 4) | (c & 0x0F);
+    }
+    ++canCmdFill;
+  }
+}
+
+static uint8_t parseHexByte (void) {
+  char c1 = canCmdBuf[canCmdFill++];
+  char c2 = canCmdBuf[canCmdFill++];
+  if (c1 > '9') c1 += 7;
+  if (c2 > '9') c2 += 7;
+  return ((c1 & 0x0F) << 4) | (c2 & 0x0F);
+}
+
+// process one parsed CAN bus command
+static void processCanCmd (void) {
+  uint32_t addr = parseHexNum();
+  char sep = canCmdBuf[canCmdFill++];
+  chprintf(chp1, "CAN: 0x%x %d\r\n", addr, sep);
+
+  if (sep == '#') {
+    CANTxFrame txMsg;
+    txMsg.IDE = addr < 0x800 ? CAN_IDE_STD : CAN_IDE_EXT;
+    txMsg.EID = addr;
+    txMsg.DLC = 0;
+    if (canCmdBuf[canCmdFill] == 'R')
+      txMsg.RTR = CAN_RTR_REMOTE;
+    else {
+      txMsg.RTR = CAN_RTR_DATA;
+      while (canCmdBuf[canCmdFill] > ' ' && txMsg.DLC < 8)
+        txMsg.data8[txMsg.DLC++] = parseHexByte();
+    }
+    canTransmit(&CAND1, 1, &txMsg, 100);
+  }
+}
+
+// collect chunks of incoming data and extract "S...\n" commands
+static void parseCanCmds (const char* buf, int len) {
+  int i;
+  for (i = 0; i < len; ++i) {
+    char c = buf[i];
+    if (c < ' ')
+      c = 0;
+    if (c == 'S' || canCmdFill >= sizeof canCmdBuf)
+      canCmdFill = 0;
+    canCmdBuf[canCmdFill++] = buf[i];
+    if (c == 0 && canCmdBuf[0] == 'S') {
+      canCmdFill = 1;
+      processCanCmd();
+      canCmdBuf[0] = 0;
+    }
+  }
+}
+
+// telnet-like server, reads text commands from an open network connection
 static void canBridge_serve (struct netconn *conn) {
   struct netbuf *inbuf;
-  err_t err = netconn_recv(conn, &inbuf);
-  if (err == ERR_OK) {
+  for (;;) {
+    err_t err = netconn_recv(conn, &inbuf);
+    if (err != ERR_OK)
+      break;
     char *buf;
     u16_t buflen;
     netbuf_data(inbuf, (void **)&buf, &buflen);
-    netconn_write(conn, buf, buflen, NETCONN_NOCOPY);
-    netconn_write(conn, "?\r\n", 3, NETCONN_NOCOPY);
+    parseCanCmds(buf, buflen);
+    netbuf_delete(inbuf);
   }
   netconn_close(conn);
-  netbuf_delete(inbuf);
 }
 
-WORKING_AREA(wa_canBridge, 1024);
+WORKING_AREA(wa_canBridge, 512);
 msg_t canBridge (void *p) {
   (void)p;
+  chRegSetThreadName("canbridge");
 
   struct netconn *conn = netconn_new(NETCONN_TCP);
   LWIP_ERROR("canBridge: invalid conn", (conn != NULL), return RDY_RESET;);
