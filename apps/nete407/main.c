@@ -29,35 +29,16 @@
 
 #include "ff.h"
 
-/*===========================================================================*/
-/* Card insertion monitor.                                                   */
-/*===========================================================================*/
+// Card insertion monitor
 
 #define POLLING_INTERVAL                10
 #define POLLING_DELAY                   10
 
-/**
- * @brief   Card monitor timer.
- */
-static VirtualTimer tmr;
+static VirtualTimer tmr; // Card monitor timer.
+static unsigned cnt; // Debounce counter.
+static EventSource inserted_event, removed_event; // Card event sources.
 
-/**
- * @brief   Debounce counter.
- */
-static unsigned cnt;
-
-/**
- * @brief   Card event sources.
- */
-static EventSource inserted_event, removed_event;
-
-/**
- * @brief   Insertion monitor timer callback function.
- *
- * @param[in] p         pointer to the @p BaseBlockDevice object
- *
- * @notapi
- */
+// Insertion monitor timer callback function.
 static void tmrfunc(void *p) {
   BaseBlockDevice *bbdp = p;
 
@@ -81,15 +62,8 @@ static void tmrfunc(void *p) {
   chSysUnlockFromIsr();
 }
 
-/**
- * @brief   Polling monitor start.
- *
- * @param[in] p         pointer to an object implementing @p BaseBlockDevice
- *
- * @notapi
- */
+// Polling monitor start.
 static void tmr_init(void *p) {
-
   chEvtInit(&inserted_event);
   chEvtInit(&removed_event);
   chSysLock();
@@ -98,20 +72,12 @@ static void tmr_init(void *p) {
   chSysUnlock();
 }
 
-/*===========================================================================*/
-/* FatFs related.                                                            */
-/*===========================================================================*/
+// FatFs related
 
-/**
- * @brief FS object.
- */
-static FATFS SDC_FS;
+static FATFS SDC_FS; // FS object.
+static bool_t fs_ready = FALSE; // FS mounted and ready.
 
-/* FS mounted and ready.*/
-static bool_t fs_ready = FALSE;
-
-/* Generic large buffer.*/
-static uint8_t fbuff[1024];
+static uint8_t fbuff[1024]; // Generic large buffer.
 
 static FRESULT scan_files(BaseSequentialStream *chp, char *path) {
   FRESULT res;
@@ -150,25 +116,17 @@ static FRESULT scan_files(BaseSequentialStream *chp, char *path) {
   return res;
 }
 
-/*===========================================================================*/
-/* USB related stuff.                                                        */
-/*===========================================================================*/
+// USB related stuff
 
-/*
- * Endpoints to be used for USBD1.
- */
+// Endpoints to be used for USBD1.
 #define USBD1_DATA_REQUEST_EP           1
 #define USBD1_DATA_AVAILABLE_EP         1
 #define USBD1_INTERRUPT_REQUEST_EP      2
 
-/*
- * Serial over USB Driver structure.
- */
+// Serial over USB Driver structure.
 static SerialUSBDriver SDU1;
 
-/*
- * USB Device Descriptor.
- */
+// USB Device Descriptor.
 static const uint8_t vcom_device_descriptor_data[18] = {
   USB_DESC_DEVICE       (0x0110,        /* bcdUSB (1.1).                    */
                          0x02,          /* bDeviceClass (CDC).              */
@@ -184,9 +142,7 @@ static const uint8_t vcom_device_descriptor_data[18] = {
                          1)             /* bNumConfigurations.              */
 };
 
-/*
- * Device Descriptor wrapper.
- */
+// Device Descriptor wrapper.
 static const USBDescriptor vcom_device_descriptor = {
   sizeof vcom_device_descriptor_data,
   vcom_device_descriptor_data
@@ -269,26 +225,20 @@ static const uint8_t vcom_configuration_descriptor_data[67] = {
                          0x00)          /* bInterval.                       */
 };
 
-/*
- * Configuration Descriptor wrapper.
- */
+// Configuration Descriptor wrapper.
 static const USBDescriptor vcom_configuration_descriptor = {
   sizeof vcom_configuration_descriptor_data,
   vcom_configuration_descriptor_data
 };
 
-/*
- * U.S. English language identifier.
- */
+// U.S. English language identifier.
 static const uint8_t vcom_string0[] = {
   USB_DESC_BYTE(4),                     /* bLength.                         */
   USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
   USB_DESC_WORD(0x0409)                 /* wLANGID (U.S. English).          */
 };
 
-/*
- * Vendor string.
- */
+// Vendor string.
 static const uint8_t vcom_string1[] = {
   USB_DESC_BYTE(38),                    /* bLength.                         */
   USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
@@ -297,9 +247,7 @@ static const uint8_t vcom_string1[] = {
   'c', 0, 's', 0
 };
 
-/*
- * Device Description string.
- */
+// Device Description string.
 static const uint8_t vcom_string2[] = {
   USB_DESC_BYTE(56),                    /* bLength.                         */
   USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
@@ -309,9 +257,7 @@ static const uint8_t vcom_string2[] = {
   'o', 0, 'r', 0, 't', 0
 };
 
-/*
- * Serial Number string.
- */
+// Serial Number string.
 static const uint8_t vcom_string3[] = {
   USB_DESC_BYTE(8),                     /* bLength.                         */
   USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
@@ -320,9 +266,7 @@ static const uint8_t vcom_string3[] = {
   '0' + CH_KERNEL_PATCH, 0
 };
 
-/*
- * Strings wrappers array.
- */
+// Strings wrappers array.
 static const USBDescriptor vcom_strings[] = {
   {sizeof vcom_string0, vcom_string0},
   {sizeof vcom_string1, vcom_string1},
@@ -338,7 +282,6 @@ static const USBDescriptor *get_descriptor(USBDriver *usbp,
                                            uint8_t dtype,
                                            uint8_t dindex,
                                            uint16_t lang) {
-
   (void)usbp;
   (void)lang;
   switch (dtype) {
@@ -353,19 +296,10 @@ static const USBDescriptor *get_descriptor(USBDriver *usbp,
   return NULL;
 }
 
-/**
- * @brief   IN EP1 state.
- */
-static USBInEndpointState ep1instate;
+static USBInEndpointState ep1instate; // IN EP1 state.
+static USBOutEndpointState ep1outstate; // OUT EP1 state.
 
-/**
- * @brief   OUT EP1 state.
- */
-static USBOutEndpointState ep1outstate;
-
-/**
- * @brief   EP1 initialization structure (both IN and OUT).
- */
+// EP1 initialization structure (both IN and OUT).
 static const USBEndpointConfig ep1config = {
   USB_EP_MODE_TYPE_BULK,
   NULL,
@@ -379,14 +313,9 @@ static const USBEndpointConfig ep1config = {
   NULL
 };
 
-/**
- * @brief   IN EP2 state.
- */
-static USBInEndpointState ep2instate;
+static USBInEndpointState ep2instate; // IN EP2 state.
 
-/**
- * @brief   EP2 initialization structure (IN only).
- */
+// EP2 initialization structure (IN only).
 static const USBEndpointConfig ep2config = {
   USB_EP_MODE_TYPE_INTR,
   NULL,
@@ -400,9 +329,7 @@ static const USBEndpointConfig ep2config = {
   NULL
 };
 
-/*
- * Handles the USB driver global events.
- */
+// Handles the USB driver global events.
 static void usb_event(USBDriver *usbp, usbevent_t event) {
 
   switch (event) {
@@ -434,9 +361,7 @@ static void usb_event(USBDriver *usbp, usbevent_t event) {
   return;
 }
 
-/*
- * USB driver configuration.
- */
+// USB driver configuration.
 static const USBConfig usbcfg = {
   usb_event,
   get_descriptor,
@@ -444,9 +369,7 @@ static const USBConfig usbcfg = {
   NULL
 };
 
-/*
- * Serial over USB driver configuration.
- */
+// Serial over USB driver configuration.
 static const SerialUSBConfig serusbcfg = {
   &USBD1,
   USBD1_DATA_REQUEST_EP,
@@ -454,9 +377,7 @@ static const SerialUSBConfig serusbcfg = {
   USBD1_INTERRUPT_REQUEST_EP
 };
 
-/*===========================================================================*/
-/* Command line related.                                                     */
-/*===========================================================================*/
+// Command line related
 
 #define SHELL_WA_SIZE   THD_WA_SIZE(2048)
 #define TEST_WA_SIZE    THD_WA_SIZE(256)
@@ -552,20 +473,14 @@ static const ShellConfig shell_cfg1 = {
   commands
 };
 
-/*===========================================================================*/
-/* Main and generic code.                                                    */
-/*===========================================================================*/
+// Main and generic code
 
-/*
- * Card insertion event.
- */
+// Card insertion event.
 static void InsertHandler(eventid_t id) {
   FRESULT err;
 
   (void)id;
-  /*
-   * On insertion SDC initialization and FS mount.
-   */
+  // On insertion SDC initialization and FS mount.
   if (sdcConnect(&SDCD1))
     return;
 
@@ -577,22 +492,16 @@ static void InsertHandler(eventid_t id) {
   fs_ready = TRUE;
 }
 
-/*
- * Card removal event.
- */
+// Card removal event.
 static void RemoveHandler(eventid_t id) {
-
   (void)id;
   sdcDisconnect(&SDCD1);
   fs_ready = FALSE;
 }
 
-/*
- * Green LED blinker thread, times are in milliseconds.
- */
+// Green LED blinker thread, times are in milliseconds.
 static WORKING_AREA(waThread1, 128);
 static msg_t Thread1(void *arg) {
-
   (void)arg;
   chRegSetThreadName("blinker");
   while (TRUE) {
@@ -635,9 +544,7 @@ static msg_t can_rx (void * p) {
   return 0;
 }
 
-/*
- * Application entry point.
- */
+// Application entry point.
 int main(void) {
   static Thread *shelltp = NULL;
   static const evhandler_t evhndl[] = {
@@ -656,9 +563,7 @@ int main(void) {
   halInit();
   chSysInit();
 
-  /*
-   * Initializes a serial-over-USB CDC driver.
-   */
+  // Initializes a serial-over-USB CDC driver.
   sduObjectInit(&SDU1);
   sduStart(&SDU1, &serusbcfg);
 
@@ -672,9 +577,7 @@ int main(void) {
   usbStart(serusbcfg.usbp, &usbcfg);
   usbConnectBus(serusbcfg.usbp);
 
-  /*
-   * Shell manager initialization.
-   */
+  // Shell manager initialization.
   shellInit();
 
   /*
@@ -693,14 +596,10 @@ int main(void) {
   canStart(&CAND1, &cancfg);
   canStart(&CAND2, &cancfg);
 
-  /*
-   * Activates the card insertion monitor.
-   */
+  // Activates the card insertion monitor.
   tmr_init(&SDCD1);
 
-  /*
-   * Creates the blinker thread.
-   */
+  // Creates the blinker thread.
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
 
   // CAN transmit test
@@ -716,15 +615,11 @@ int main(void) {
   // Creates the CAN receive thread.
   chThdCreateStatic(can_rx_wa, sizeof(can_rx_wa), NORMALPRIO, can_rx, NULL);
 
-  /*
-   * Creates the LWIP threads (it changes priority internally).
-   */
+  // Creates the LWIP threads (it changes priority internally).
   chThdCreateStatic(wa_lwip_thread, LWIP_THREAD_STACK_SIZE, NORMALPRIO + 2,
                     lwip_thread, NULL);
 
-  /*
-   * Creates the HTTP thread (it changes priority internally).
-   */
+  // Creates the HTTP thread (it changes priority internally).
   chThdCreateStatic(wa_http_server, sizeof(wa_http_server), NORMALPRIO + 1,
                     http_server, NULL);
 
