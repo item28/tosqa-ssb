@@ -12,6 +12,7 @@ Brief description of the applications in this area:
 * **knobdial** - read out rotary switches and drive other stepper boards
 * **minimal** - absolutely minimal blinker, no ChibiOS or other libs
 * **netdemo** - test application for the AOAA board's LPC1769
+* **nete407** - test application for the Olimex STM32-E407 board
 * **pwmstep** - a first test to drive the stepper motor from PWM
 * **rampstep** - drive the stepper motor from PWM with linear ramping
 * **satdemo** - test the OLED display on the AOAA satellite's LPC11C24
