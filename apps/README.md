@@ -15,6 +15,7 @@ Brief description of the applications in this area:
 * **nete407** - test application for the Olimex STM32-E407 board
 * **pwmstep** - a first test to drive the stepper motor from PWM
 * **rampstep** - drive the stepper motor from PWM with linear ramping
+* **rotaries** - interface two rotary encoders to the CAN bus
 * **satdemo** - test the OLED display on the AOAA satellite's LPC11C24
 * **satmon** - report incoming CAN messages on the AOAA satellite display
 * **stepcan** - send out lots of stepper commands on the CAN bus
