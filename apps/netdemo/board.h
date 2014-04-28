@@ -94,10 +94,12 @@
 #define GPIO2_RGB1_RED          0
 #define GPIO2_RGB1_BLUE         1
 #define GPIO2_RGB1_GREEN        2
+#define GPIO2_KEY1              11
 
 #define GPIO2_RGB2_RED          3
 #define GPIO2_RGB2_BLUE         4
 #define GPIO2_RGB2_GREEN        5
+#define GPIO2_KEY2              12
 
 #define GPIO0_LED2_RED          22
 // #define GPIO0_LED3_EXT          28  /* Connect LED to board. */

@@ -30,6 +30,8 @@
 
 static const char* greet = "\r\n[netdemo]\r\n";
 
+int enableBootMaster; // toggled with key2
+
 // Card insertion monitor
 
 #define POLLING_INTERVAL                10
@@ -401,6 +403,8 @@ static msg_t can_rx (void * p) {
   while(!chThdShouldTerminate()) {
     while (canReceive(&CAND1, CAN_ANY_MAILBOX, &rxmsg, 100) == RDY_OK) {
       canToBridge(&rxmsg);
+      if (!enableBootMaster)
+        continue;
       /* Process message, with manual filtering */
       if (rxmsg.IDE && (rxmsg.EID & 0x1FFFFF80) == 0x1F123480) {
         if (rxmsg.DLC == 8) {
@@ -700,9 +704,25 @@ int main (void) {
   static WORKING_AREA(waShell, SHELL_WA_SIZE);
   shellCreateStatic(&shell_cfg1, waShell, sizeof(waShell), NORMALPRIO);
 
-  // main loop - sleep in a loop and listen for events.
+  // main loop - sleep in a loop and listen for events, also check buttons
   chEvtRegister(&inserted_event, &el0, 0);
   chEvtRegister(&removed_event, &el1, 1);
-  while (TRUE)
-    chEvtDispatch(evhndl, chEvtWaitOne(ALL_EVENTS));
+  int b1 = 0, b2 = 0;
+  while (TRUE) {
+    chEvtDispatch(evhndl, chEvtWaitOneTimeout(ALL_EVENTS, MS2ST(10)));
+    int nb1 = palReadPad(GPIO2, GPIO2_KEY1);
+    if (b1 != nb1) {
+      b1 = nb1;
+      // if (b1 == 0)
+      //   button1();
+    }
+    int nb2 = palReadPad(GPIO2, GPIO2_KEY2);
+    if (b2 != nb2) {
+      b2 = nb2;
+      if (b2 == 0) {
+        palTogglePad(GPIO2, GPIO2_RGB2_GREEN);
+        enableBootMaster = !enableBootMaster;
+      }
+    }
+  }
 }
