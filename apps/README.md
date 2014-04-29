@@ -7,6 +7,7 @@ Brief description of the applications in this area:
 * **cansend** - periodic send of three ADC readouts
 * **canuid** - send out the LPC11C24's unique device id
 * **digipot** - move the digital vref adjust through its entire range
+* **disco429** - test application for the STM32F429 Discovery board
 * **driver** - complete CAN and stepper driver for the SSB
 * **fakeboot** - test re-flashing code and the secondary boot mechanism
 * **knobdial** - read out rotary switches and drive other stepper boards
@@ -26,6 +27,7 @@ The most important firmware applications in the above list are:
 The **bootsend** app includes a compiled copy of _canboot_, which it can send
 to an LPC11C24 powered-up in native ROM-based CAN boot mode (PIO0_3 low). This
 NXP-defined protocol runs over CAN at 100 KHz and uses CANopen'ish commands.
+This code is for standalone use as "Boot Installer" for new LPC11C24 boards.
 
 The **canboot** app is intended to be installed once on each LPC11C24, and
 causes it to request a node ID and look for firmware upgrades on every reset.
@@ -38,4 +40,4 @@ _re-mapped_ to their corresponding vectors, i.e. also 4 KB higher than usual.
 The **driver** app is the actual code for the Single Stepper Board. It listens
 for commands coming in over the CAN bus, and drives the attached stepper motor.
 
-The "`net*`" and "`sat*`" apps are for use with the Embedded Artists AOAA board.
+The "`net*`" and "`sat*`" apps are for boards from EA, Olimex, or STM.
