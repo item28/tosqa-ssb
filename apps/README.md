@@ -7,6 +7,7 @@ Brief description of the applications in this area:
 * **cansend** - periodic send of three ADC readouts
 * **canuid** - send out the LPC11C24's unique device id
 * **digipot** - move the digital vref adjust through its entire range
+* **disco051** - test application for the STM32F0 Discovery board
 * **disco429** - test application for the STM32F429 Discovery board
 * **driver** - complete CAN and stepper driver for the SSB
 * **fakeboot** - test re-flashing code and the secondary boot mechanism
