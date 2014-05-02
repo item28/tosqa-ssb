@@ -17,6 +17,7 @@ Brief description of the applications in this area:
 * **netdemo** - test application for the AOAA board's LPC1769
 * **nete407** - test application for the Olimex STM32-E407 board
 * **nucleo1** - test application for the STM32 Nucleo F103 board
+* **olip103** - test application for the Olimex STM32-P103 board
 * **pwmstep** - a first test to drive the stepper motor from PWM
 * **rampstep** - drive the stepper motor from PWM with linear ramping
 * **rotaries** - interface two rotary encoders to the CAN bus
@@ -43,4 +44,5 @@ _re-mapped_ to their corresponding vectors, i.e. also 4 KB higher than usual.
 The **driver** app is the actual code for the Single Stepper Board. It listens
 for commands coming in over the CAN bus, and drives the attached stepper motor.
 
-The "`net*`" and "`sat*`" apps are for boards from EA, Olimex, or STM.
+The "`disco*`", "`net*`", "`oli*`", and "`sat*`" apps are for various boards
+from Embedded Artists, Olimex, and STMicro.
