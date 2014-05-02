@@ -16,6 +16,7 @@ Brief description of the applications in this area:
 * **minimal** - absolutely minimal blinker, no ChibiOS or other libs
 * **netdemo** - test application for the AOAA board's LPC1769
 * **nete407** - test application for the Olimex STM32-E407 board
+* **nucleo1** - test application for the STM32 Nucleo F103 board
 * **pwmstep** - a first test to drive the stepper motor from PWM
 * **rampstep** - drive the stepper motor from PWM with linear ramping
 * **rotaries** - interface two rotary encoders to the CAN bus
