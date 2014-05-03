@@ -12,6 +12,7 @@ Brief description of the applications in this area:
 * **disco429** - test application for the STM32F429 Discovery board
 * **driver** - complete CAN and stepper driver for the SSB
 * **fakeboot** - test re-flashing code and the secondary boot mechanism
+* **ifex** - code for the STM32-P103 "Interface Explorer" board, see wiki
 * **knobdial** - read out rotary switches and drive other stepper boards
 * **minimal** - absolutely minimal blinker, no ChibiOS or other libs
 * **netdemo** - test application for the AOAA board's LPC1769
