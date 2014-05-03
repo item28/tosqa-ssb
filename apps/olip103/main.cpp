@@ -359,6 +359,7 @@ static const SerialUSBConfig serusbcfg = {
   USBD1_INTERRUPT_REQUEST_EP
 };
 
+#if TESTER
 /*
  * Tester thread class. This thread executes the test suite.
  */
@@ -377,8 +378,9 @@ public:
   }
 };
 
-/* Static threads instances.*/
 static TesterThread tester;
+#endif
+
 static SequencerThread blinker1(LED1_sequence);
 
 /*
@@ -426,8 +428,10 @@ int main(void) {
    */
   while (true) {
     if (palReadPad(GPIOA, GPIOA_BUTTON)) {
+#if TESTER
       tester.start(NORMALPRIO);
       tester.wait();
+#endif
     };
     BaseThread::sleep(MS2ST(500));
   }
