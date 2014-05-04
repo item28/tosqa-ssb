@@ -391,7 +391,7 @@ static SPIConfig ls_spicfg = {NULL, IOPORT2, GPIOB_SPI2NSS,
 static MMCConfig mmccfg = {&SPID2, &ls_spicfg, &hs_spicfg};
 
 /* Generic large buffer.*/
-uint8_t fbuff[1024];
+uint8_t fbuff[256]; // was 1024
 
 static FRESULT scan_files(BaseSequentialStream *chp, char *path) {
   FRESULT res;
@@ -434,7 +434,7 @@ static FRESULT scan_files(BaseSequentialStream *chp, char *path) {
 /* Command line related.                                                     */
 /*===========================================================================*/
 
-#define SHELL_WA_SIZE   THD_WA_SIZE(2048)
+#define SHELL_WA_SIZE   THD_WA_SIZE(1024) // was 2048
 #define TEST_WA_SIZE    THD_WA_SIZE(256)
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
@@ -471,6 +471,7 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[]) {
   } while (tp != NULL);
 }
 
+#if TESTER
 static void cmd_test(BaseSequentialStream *chp, int argc, char *argv[]) {
   Thread *tp;
 
@@ -487,6 +488,7 @@ static void cmd_test(BaseSequentialStream *chp, int argc, char *argv[]) {
   }
   chThdWait(tp);
 }
+#endif
 
 static void cmd_tree(BaseSequentialStream *chp, int argc, char *argv[]) {
   FRESULT err;
@@ -518,7 +520,9 @@ static void cmd_tree(BaseSequentialStream *chp, int argc, char *argv[]) {
 static const ShellCommand commands[] = {
   {"mem", cmd_mem},
   {"threads", cmd_threads},
+#if TESTER
   {"test", cmd_test},
+#endif
   {"tree", cmd_tree},
   {NULL, NULL}
 };
