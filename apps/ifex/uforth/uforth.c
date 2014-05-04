@@ -137,9 +137,9 @@ char next_char(void) {
 }
 
 char* uforth_next_word (void) {
-  while (isspace(*uforth_iram->inbufptr)) ++uforth_iram->inbufptr;
+  while (isspace((uint8_t)*uforth_iram->inbufptr)) ++uforth_iram->inbufptr;
   uforth_iram->currword = uforth_iram->inbufptr;
-  while (*uforth_iram->inbufptr != 0 && !isspace(*uforth_iram->inbufptr)) ++uforth_iram->inbufptr;
+  while (*uforth_iram->inbufptr != 0 && !isspace((uint8_t)*uforth_iram->inbufptr)) ++uforth_iram->inbufptr;
   uforth_iram->currwordlen = uforth_iram->inbufptr - uforth_iram->currword;
   return uforth_iram->currword;
 }

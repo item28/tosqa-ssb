@@ -52,14 +52,14 @@ void runForth(BaseSequentialStream* chp, const uint8_t* romdict) {
   while (TRUE) {
     // chprintf(serio, "\r\n %d> ", uforth_uram->didx + 1);
     chprintf(serio, " OK\r\n");
-    if (getLine(buf, sizeof buf))
+    if (getLine((char*) buf, sizeof buf))
       break;
     chSequentialStreamPut(serio, ' ');
-    int stat = uforth_interpret(buf);
+    int stat = uforth_interpret((char*) buf);
     switch(stat) {
     case E_NOT_A_WORD:
       chprintf(serio, "Huh? >>> ");
-      chSequentialStreamWrite(serio, uforth_iram->currword, uforth_iram->currwordlen);
+      chSequentialStreamWrite(serio, (uint8_t*) uforth_iram->currword, uforth_iram->currwordlen);
       chprintf(serio, " <<< %s\r\n", uforth_iram->currword + uforth_iram->currwordlen);
       break;
     case E_ABORT:
