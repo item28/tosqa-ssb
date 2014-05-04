@@ -22,8 +22,8 @@
 #include "shell.h"
 #include "evtimer.h"
 #include "chprintf.h"
-
 #include "ff.h"
+#include "data.h"
 
 // USB related stuff
 
@@ -490,6 +490,14 @@ static void cmd_test(BaseSequentialStream *chp, int argc, char *argv[]) {
 }
 #endif
 
+#include "forth.h"
+
+static void cmd_uforth(BaseSequentialStream *chp, int argc, char *argv[]) {
+    (void)argc;
+    (void)argv;
+    runForth(chp, bootData);
+}
+
 static void cmd_tree(BaseSequentialStream *chp, int argc, char *argv[]) {
   FRESULT err;
   uint32_t clusters;
@@ -524,6 +532,7 @@ static const ShellCommand commands[] = {
   {"test", cmd_test},
 #endif
   {"tree", cmd_tree},
+  {"f", cmd_uforth},
   {NULL, NULL}
 };
 

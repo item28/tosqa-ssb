@@ -1,2 +1,5 @@
 .dep/
 build/
+*.o
+apps/ifex/uforth/uforth-pc
+apps/ifex/uforth/image.bin
