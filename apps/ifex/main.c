@@ -630,9 +630,13 @@ int main(void) {
   usbConnectBus(serusbcfg.usbp);
 
   /*
-   * Activates the serial driver 2 using the driver default configuration.
+   * Activates the serial drivers using the driver default configuration.
    */
-  // sdStart(&SD2, NULL);
+  sdStart(&SD1, NULL);
+  sdStart(&SD2, NULL);
+
+  chprintf((BaseSequentialStream *)&SD1, "hello 1!\r\n");
+  chprintf((BaseSequentialStream *)&SD2, "hello 2!\r\n");
 
   /*
    * Shell manager initialization.
