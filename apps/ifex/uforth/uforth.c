@@ -1,8 +1,8 @@
 /*
   uForth - A tiny ROMable 16/32-bit FORTH-like scripting language
           for microcontrollers.
-	  http://maplefish.com/todd/uforth.html
-	  Version 2.0
+          http://maplefish.com/todd/uforth.html
+          Version 2.0
 
   License for uForth 0.1 and later versions
 
@@ -36,8 +36,8 @@
 #include "uforth-config.h"
 #include "uforth.h"
 
-CELL *uforth_dict;			/* treat dict struct like array */
-abort_t _uforth_abort_request;	/* for emergency aborts */
+CELL *uforth_dict;                      /* treat dict struct like array */
+abort_t _uforth_abort_request;  /* for emergency aborts */
 
 struct uforth_iram *uforth_iram;
 struct uforth_uram *uforth_uram;
@@ -93,7 +93,7 @@ DCELL parse_num(char *s, uint8_t base) {
   double f;
   char *p = s;
   while (*p != '\0' && *p != ' ' && *p != '.') ++p;
-  if (*p == '.') {		/* got a dot, must be floating */
+  if (*p == '.') {              /* got a dot, must be floating */
     f = strtod(s,NULL);
     return (DCELL)FIXED_PT_MULT(f);
   }
@@ -112,7 +112,7 @@ DCELL parse_num(char *s, uint8_t base) {
 */
 CELL find_word(char* s, uint8_t len, DCELL* addr, char *immediate, char *prim);
 
-CELL defining_word = 0;		/* are we currently defining a word? */
+CELL defining_word = 0;         /* are we currently defining a word? */
 void make_word(char *str, uint8_t str_len) {
   CELL my_head = dict_here();
 
@@ -184,7 +184,7 @@ static CELL cmd;
 
 
 CELL uforth_make_task (DCELL uram, 
-		       CELL ds,CELL rs,CELL rams) {
+                       CELL ds,CELL rs,CELL rams) {
   struct uforth_uram* u = (struct uforth_uram*)
     (uforth_ram + sizeof(struct uforth_iram)+(uram*sizeof(DCELL)));
   u->len = rams;
@@ -297,14 +297,14 @@ uforth_stat exec(CELL wd_idx, char toplevelprim,uint8_t last_exec_rdix) {
   while(1) {
     if (wd_idx == 0) {
       uforth_abort_request(ABORT_ILLEGAL);
-      uforth_abort();		/* bad instruction */
+      uforth_abort();           /* bad instruction */
       return E_NOT_A_WORD;
     }
     cmd = uforth_dict[wd_idx++];
     switch (cmd) {
     case 0:
       uforth_abort_request(ABORT_ILLEGAL);
-      uforth_abort();		/* bad instruction */
+      uforth_abort();           /* bad instruction */
       return E_NOT_A_WORD;
     case ABORT:
       uforth_abort_request(ABORT_WORD);
@@ -344,7 +344,7 @@ uforth_stat exec(CELL wd_idx, char toplevelprim,uint8_t last_exec_rdix) {
       break;
     case DLIT:  
       dpush((((uint32_t)uforth_dict[wd_idx])<<16) |
-	    (uint16_t)uforth_dict[wd_idx+1]); 
+            (uint16_t)uforth_dict[wd_idx+1]); 
       wd_idx+=2;
       break;
     case LESS_THAN:
@@ -420,18 +420,18 @@ uforth_stat exec(CELL wd_idx, char toplevelprim,uint8_t last_exec_rdix) {
     case FETCH:
       r1 = dpop();
       if (r1 >= RAM_START_IDX) {
-	dpush(uforth_ram[r1-RAM_START_IDX]);
+        dpush(uforth_ram[r1-RAM_START_IDX]);
       } else {
-	dpush(uforth_dict[r1]);
+        dpush(uforth_dict[r1]);
       }
       break;
     case STORE:
       r1 = dpop();
       r2 = dpop();
       if (r1 >= RAM_START_IDX) {
-	uforth_ram[r1-RAM_START_IDX] = r2;
+        uforth_ram[r1-RAM_START_IDX] = r2;
       } else {
-	dict_write(r1,r2);
+        dict_write(r1,r2);
       }
       break;
     case EXEC:
@@ -460,39 +460,39 @@ uforth_stat exec(CELL wd_idx, char toplevelprim,uint8_t last_exec_rdix) {
       str2 = PAD_STR;
       str1 = uforth_next_word();
       memcpy(str2,str1, uforth_iram->currwordlen);
-      PAD_STRLEN = uforth_iram->currwordlen;		/* length */
+      PAD_STRLEN = uforth_iram->currwordlen;            /* length */
       dpush(PAD_ADDR+RAM_START_IDX);
       break;
     case COMMA_STRING:
       if (uforth_iram->compiling > 0) {
-	dict_append(LIT);
-	dict_append(dict_here()+4); /* address of counted string */
+        dict_append(LIT);
+        dict_append(dict_here()+4); /* address of counted string */
 
-	dict_append(LIT);
-	rpush(dict_here());	/* address holding adress  */
-	dict_incr_here(1);	/* place holder for jump address */
-	dict_append(JMP);
+        dict_append(LIT);
+        rpush(dict_here());     /* address holding adress  */
+        dict_incr_here(1);      /* place holder for jump address */
+        dict_append(JMP);
       }
       rpush(dict_here());
-      dict_incr_here(1);	/* place holder for count*/
+      dict_incr_here(1);        /* place holder for count*/
       r1 = 0;
-      b = next_char();		/* eat space */
+      b = next_char();          /* eat space */
       while (b != 0 && b!= '"') {
-	r2 = 0;
-	b = next_char();
-	if (b == 0 || b == '"') break;
-	r2 |= BYTEPACK_FIRST(b);
-	++r1;
-	b = next_char();
-	if (b != 0 && b != '"') {
-	  ++r1;
-	  r2 |= BYTEPACK_SECOND(b);
-	}
-	dict_append(r2);
+        r2 = 0;
+        b = next_char();
+        if (b == 0 || b == '"') break;
+        r2 |= BYTEPACK_FIRST(b);
+        ++r1;
+        b = next_char();
+        if (b != 0 && b != '"') {
+          ++r1;
+          r2 |= BYTEPACK_SECOND(b);
+        }
+        dict_append(r2);
       } 
       dict_write(rpop(),r1);
       if (uforth_iram->compiling > 0) {
-	dict_write(rpop(),dict_here());	/* jump over string */
+        dict_write(rpop(),dict_here()); /* jump over string */
       }
       break;
     case CALLC:
@@ -509,9 +509,9 @@ uforth_stat exec(CELL wd_idx, char toplevelprim,uint8_t last_exec_rdix) {
       uforth_next_word();
       make_word(uforth_iram->currword,uforth_iram->currwordlen);
       if (cmd == _CREATE) {
-	dict_end_def();
+        dict_end_def();
       } else {
-	defining_word = dict_here();
+        defining_word = dict_here();
       }
       break;
     case COMMA:
@@ -541,47 +541,47 @@ uforth_stat exec(CELL wd_idx, char toplevelprim,uint8_t last_exec_rdix) {
       str1=uforth_count_str((CELL)r1,(CELL*)&r1);
       r1 = find_word(str1, r1, &r2, 0, &b);
       if (r1 > 0) {
-	if (b) r1 = uforth_dict[r1];
+        if (b) r1 = uforth_dict[r1];
       }
       if (cmd == FIND) {
-	dpush(r1);
+        dpush(r1);
       } else {
-	dpush(r2);
+        dpush(r2);
       }
       break;
     case POSTPONE:
       str1 = uforth_next_word();
       r1 = find_word(str1, uforth_iram->currwordlen, 0, 0, &b);
       if (r1 == 0) {
-	uforth_abort_request(ABORT_NAW);
-	uforth_abort();
-	return E_NOT_A_WORD;
+        uforth_abort_request(ABORT_NAW);
+        uforth_abort();
+        return E_NOT_A_WORD;
       }
       if (b) {
-	dict_append(uforth_dict[r1]);
+        dict_append(uforth_dict[r1]);
       } else {
-	dict_append(r1);
+        dict_append(r1);
       }
       break;
     case MOVE:
-      r1 = dpop();		/* count */
+      r1 = dpop();              /* count */
       rpush(r1);
 
-      r1 = dpop();		/* dest */
-      r2 = dpop();		/* source */
+      r1 = dpop();              /* dest */
+      r2 = dpop();              /* source */
 
       if (r1 < RAM_START_IDX) {
-	(void)rpop();
-	uforth_abort_request(ABORT_ILLEGAL);
-	uforth_abort();		/* can't cmove into dictionary */
-	return E_ABORT;
+        (void)rpop();
+        uforth_abort_request(ABORT_ILLEGAL);
+        uforth_abort();         /* can't cmove into dictionary */
+        return E_ABORT;
       }
       str1 =(char*)&uforth_ram[(r1-RAM_START_IDX)];
 
       if (r2 > RAM_START_IDX) {
-	str2 =(char*)&uforth_ram[(r2-RAM_START_IDX)];
+        str2 =(char*)&uforth_ram[(r2-RAM_START_IDX)];
       } else {
-	str2 =  (char*)&uforth_dict[r2];
+        str2 =  (char*)&uforth_dict[r2];
       }
       memcpy(str1, str2, rpop());
       break;
@@ -643,81 +643,81 @@ uforth_stat uforth_interpret(char *str) {
   while(*(word = uforth_next_word()) != 0) {
     wd_idx = find_word(word,uforth_iram->currwordlen,0,&immediate,&primitive);
     switch (uforth_iram->compiling) {
-    case 0:			/* interpret mode */
-      if (wd_idx == 0) {	/* number or trash */
-	DCELL num = parse_num(word,uforth_uram->base);
-	if (num == 0 && word[0] != '0') {
-	  uforth_abort_request(ABORT_NAW);
-	  uforth_abort();
-	  return E_NOT_A_WORD;
-	}
-	if (abs32(num) > (int32_t)MAX_CELL_NUM){
-	  dpush32(num);
-	} else {
-	  dpush(num);
-	}
+    case 0:                     /* interpret mode */
+      if (wd_idx == 0) {        /* number or trash */
+        DCELL num = parse_num(word,uforth_uram->base);
+        if (num == 0 && word[0] != '0') {
+          uforth_abort_request(ABORT_NAW);
+          uforth_abort();
+          return E_NOT_A_WORD;
+        }
+        if (abs32(num) > (int32_t)MAX_CELL_NUM){
+          dpush32(num);
+        } else {
+          dpush(num);
+        }
       } else {
-	stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
-	if (stat != OK) {
-	  uforth_abort();
-	  uforth_abort_clr();
-	  return stat;
-	}
+        stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
+        if (stat != OK) {
+          uforth_abort();
+          uforth_abort_clr();
+          return stat;
+        }
       }
       break;
-    case 1:			/* in the middle of a colon def */
-      if (wd_idx == 0) {	/* number or trash */
-	DCELL num = parse_num(word,uforth_uram->base);
-	if (num == 0 && word[0] != '0') {
-	  uforth_abort_request(ABORT_NAW);
-	  uforth_abort();
-	  dict_end_def();
-	  return E_NOT_A_WORD;
-	}
-	/* OPTIMIZATION: Only DLIT big numbers */
-	if (num < 0 || abs32(num) > (int32_t)MAX_CELL_NUM){
-	  dict_append(DLIT);
-	  dict_append(((uint32_t)num)>>16);
-	  dict_append(((uint16_t)num)&0xffff);
-	} else {
-	  dict_append(LIT);
-	  dict_append(num);
-	}
-      }	else if (word[0] == ';') { /* exit from a colon def */
-	uforth_iram->compiling = 0;
-	dict_append(EXIT);
-	dict_end_def();
-	defining_word = 0;
-      } else if (immediate) {	/* run immediate word */
-	stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
-	if (stat != OK) {
-	  uforth_abort_request(ABORT_ILLEGAL);
-	  uforth_abort();
-	  dict_end_def();
-	  return stat;
-	}
-      } else {			/* just compile word */
-	if (primitive) {
-	  /* OPTIMIZATION: inline primitive */
-	  dict_append(uforth_dict[wd_idx]);
-	} else {
-	  /* OPTIMIZATION: skip null definitions */
-	  if (uforth_dict[wd_idx] != EXIT) {
-	    if (wd_idx == defining_word) { 
-	      /* Natural recursion for such a small language is dangerous.
-		 However, tail recursion is quite useful for getting rid
-		 of BEGIN AGAIN/UNTIL/WHILE-REPEAT and DO LOOP in some
-		 situations. We don't check to see if this is truly a
-		 tail call, but we treat it as such.
-	      */
-	      dict_append(LIT);
-	      dict_append(defining_word);
-	      dict_append(JMP);
-	    } else {
-	      dict_append(wd_idx);
-	    }
-	  }
-	}
+    case 1:                     /* in the middle of a colon def */
+      if (wd_idx == 0) {        /* number or trash */
+        DCELL num = parse_num(word,uforth_uram->base);
+        if (num == 0 && word[0] != '0') {
+          uforth_abort_request(ABORT_NAW);
+          uforth_abort();
+          dict_end_def();
+          return E_NOT_A_WORD;
+        }
+        /* OPTIMIZATION: Only DLIT big numbers */
+        if (num < 0 || abs32(num) > (int32_t)MAX_CELL_NUM){
+          dict_append(DLIT);
+          dict_append(((uint32_t)num)>>16);
+          dict_append(((uint16_t)num)&0xffff);
+        } else {
+          dict_append(LIT);
+          dict_append(num);
+        }
+      } else if (word[0] == ';') { /* exit from a colon def */
+        uforth_iram->compiling = 0;
+        dict_append(EXIT);
+        dict_end_def();
+        defining_word = 0;
+      } else if (immediate) {   /* run immediate word */
+        stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
+        if (stat != OK) {
+          uforth_abort_request(ABORT_ILLEGAL);
+          uforth_abort();
+          dict_end_def();
+          return stat;
+        }
+      } else {                  /* just compile word */
+        if (primitive) {
+          /* OPTIMIZATION: inline primitive */
+          dict_append(uforth_dict[wd_idx]);
+        } else {
+          /* OPTIMIZATION: skip null definitions */
+          if (uforth_dict[wd_idx] != EXIT) {
+            if (wd_idx == defining_word) { 
+              /* Natural recursion for such a small language is dangerous.
+                 However, tail recursion is quite useful for getting rid
+                 of BEGIN AGAIN/UNTIL/WHILE-REPEAT and DO LOOP in some
+                 situations. We don't check to see if this is truly a
+                 tail call, but we treat it as such.
+              */
+              dict_append(LIT);
+              dict_append(defining_word);
+              dict_append(JMP);
+            } else {
+              dict_append(wd_idx);
+            }
+          }
+        }
       }
       break;
     }

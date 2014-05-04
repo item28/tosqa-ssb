@@ -75,13 +75,13 @@ uforth_stat c_handle(void) {
   static char buf[80*2];
 
   switch(r1) {
-  case UF_EMIT:			/* emit */
+  case UF_EMIT:                 /* emit */
     txc(dpop()&0xff);
     break;
-  case UF_KEY:			/* key */
+  case UF_KEY:                  /* key */
     dpush((CELL)rxc());
     break;
-  case UF_TYPE:			/* type */
+  case UF_TYPE:                 /* type */
     r1 = dpop();
     r2 = dpop();
     if (r2 >= RAM_START_IDX) {
@@ -91,7 +91,7 @@ uforth_stat c_handle(void) {
     }
     txs(str,r1);
     break;
-  case UF_SAVE_IMAGE:			/* save image */
+  case UF_SAVE_IMAGE:                   /* save image */
     {
       uforth_next_word();
       strncpy(buf, uforth_iram->currword, uforth_iram->currwordlen);
@@ -102,7 +102,7 @@ uforth_stat c_handle(void) {
       fclose(fp);
     }
     break;
-  case UF_INCLUDE:			/* include */
+  case UF_INCLUDE:                      /* include */
     {
       uforth_next_word();
       strncpy(buf,uforth_iram->currword, uforth_iram->currwordlen);
@@ -110,10 +110,10 @@ uforth_stat c_handle(void) {
       printf("   Loading %s\n",buf);
       fp = fopen(buf, "r");
       if (fp != NULL) {
-	interpret_from(fp);
-	fclose(fp);
+        interpret_from(fp);
+        fclose(fp);
       } else {
-	printf("File not found: %s\n", buf);
+        printf("File not found: %s\n", buf);
       }
     }  
     break;

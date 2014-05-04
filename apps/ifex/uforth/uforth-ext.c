@@ -28,27 +28,27 @@ void c_ext_create_cmds(void) {
   
 */
 uforth_stat c_ext_handle_cmds(CELL n) {
-  CELL r1, r2,r3;		/* NOTE: THESE ARE 16 bit values! */
+  CELL r1, r2,r3;               /* NOTE: THESE ARE 16 bit values! */
   char *str1;
 
   switch (n) {
-  case UF_INTERP:		/* recursively call the uforth interpreter */
+  case UF_INTERP:               /* recursively call the uforth interpreter */
     r1 = dpop();
     str1 = uforth_count_str(r1,&r1);
     str1[r1] = '\0';
     dpush(uforth_interpret(str1));
     break;
-  case UF_SUBSTR:		/* return a substring of the uForth string */
-    r1 = dpop();		/* addr */
-    r2 = dpop();		/* length */
-    r3 = dpop();		/* start */
+  case UF_SUBSTR:               /* return a substring of the uForth string */
+    r1 = dpop();                /* addr */
+    r2 = dpop();                /* length */
+    r3 = dpop();                /* start */
     str1 = uforth_count_str(r1,&r1);
     if (r1 < r2) r2 = r1;
     PAD_STRLEN = r2;
     memcpy(PAD_STR, str1 + r3, r2);
     dpush(RAM_START_IDX+PAD_ADDR);
     break;
-  case UF_NUM_TO_STR:			/* 32bit to string */
+  case UF_NUM_TO_STR:                   /* 32bit to string */
     {
       char num[12];
       i32toa(dpop32(),num,uforth_uram->base);

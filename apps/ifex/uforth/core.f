@@ -6,8 +6,8 @@
 
 \  uForth - A tiny ROMable 16/32-bit FORTH-like scripting language
 \          for microcontrollers.
-\	  http://maplefish.com/todd/uforth.html
-\	  Dictionary Version 1.1
+\         http://maplefish.com/todd/uforth.html
+\         Dictionary Version 1.1
 \
 \  License for uForth 0.1 and later versions
 \
@@ -115,8 +115,8 @@
 \ Helper word for building the below constructs.
 \
 : [compile]
-    postpone [']			\ for later: get word
-    ['] ,  ,				\ store a comma (for later get word)
+    postpone [']                        \ for later: get word
+    ['] ,  ,                            \ store a comma (for later get word)
 ; immediate
 
 \ A create that simply returns address of here after created word.
@@ -124,7 +124,7 @@
 : create
     _create
     [compile] lit
-    here 2+ ,				\ just pass the exit (here after def)
+    here 2+ ,                           \ just pass the exit (here after def)
     [compile] ;
 ;
 
@@ -151,24 +151,24 @@
 \ Conditionals
 
 : if ( -- ifaddr)
-    [compile] lit			\ precede placeholder
-    here				\ push 'if' address on the stack
-    dummy,				\ placeholder for 'then' address
-    [compile] 0jmp?			\ compile a conditional jmp to 'then'
+    [compile] lit                       \ precede placeholder
+    here                                \ push 'if' address on the stack
+    dummy,                              \ placeholder for 'then' address
+    [compile] 0jmp?                     \ compile a conditional jmp to 'then'
 ; immediate
 
 : else ( ifaddr -- elseaddr )
-    here 3 +				\ after lit and jmp
-    swap !				\ fix 'if' to point to else block
-    [compile] lit			\ precede placeholder
-    here				\ push 'else' address on stack
-    dummy,				\ place holder for 'then' address
-    [compile] jmp			\ compile an uncoditional jmp to 'then'
+    here 3 +                            \ after lit and jmp
+    swap !                              \ fix 'if' to point to else block
+    [compile] lit                       \ precede placeholder
+    here                                \ push 'else' address on stack
+    dummy,                              \ place holder for 'then' address
+    [compile] jmp                       \ compile an uncoditional jmp to 'then'
 ; immediate
 
 
 : then ( ifaddr|elseaddr -- )
-    here swap !				\ resolve 'if' or 'else' jmp address
+    here swap !                         \ resolve 'if' or 'else' jmp address
 ; immediate
 
 
@@ -177,44 +177,44 @@
 variable _leaveloop
 
 : do ( limit start -- doaddr)
-    [compile] swap			( -- start limit)
-    [compile] >r  [compile] >r		\ store them on the return stack
-    here				\ push address of 'do' onto stack
+    [compile] swap                      ( -- start limit)
+    [compile] >r  [compile] >r          \ store them on the return stack
+    here                                \ push address of 'do' onto stack
 ; immediate ( -- r:limit r:start)
 
 : i ( -- inner_idx)
-    [compile] lit 0 , [compile] rpick	\ pick index from returrn stack
+    [compile] lit 0 , [compile] rpick   \ pick index from returrn stack
 ; immediate
 
 : j ( -- outer_idx)
-    [compile] lit 2 , [compile] rpick	\ pick index from returrn stack
+    [compile] lit 2 , [compile] rpick   \ pick index from returrn stack
 ; immediate
 
 : leave ( -- )
-    [compile] lit			\ precede placeholder
-    here _leaveloop !			\ store address for +loop resolution
-    dummy,				\ placeholder for 'leave' address
-    [compile] jmp			\ jmp out of here
+    [compile] lit                       \ precede placeholder
+    here _leaveloop !                   \ store address for +loop resolution
+    dummy,                              \ placeholder for 'leave' address
+    [compile] jmp                       \ jmp out of here
 ; immediate
 
 : +loop ( doaddr n -- )
-    [compile] r>			\ ( -- start{idx})
-    [compile] +				\ ( -- idx+n)
-    [compile] dup			\ ( -- idx idx)
-    [compile] >r			\ ( -- idx) store new
+    [compile] r>                        \ ( -- start{idx})
+    [compile] +                         \ ( -- idx+n)
+    [compile] dup                       \ ( -- idx idx)
+    [compile] >r                        \ ( -- idx) store new
     [compile] lit  1 ,
-    [compile] rpick			\ ( -- idx limit)
-    [compile] swap			\ ( -- limit idx)
+    [compile] rpick                     \ ( -- idx limit)
+    [compile] swap                      \ ( -- limit idx)
     [compile] -
-    [compile] 0=			\ if idx == limit, we are done.
+    [compile] 0=                        \ if idx == limit, we are done.
     [compile] lit
-    ,					\ store doaddr
+    ,                                   \ store doaddr
     [compile] 0jmp?
-    _leaveloop @ 0 > if			\ if we have a leave, resolve it
-	here  _leaveloop @ !		\ This is where 'leave' wants to be
-	0 _leaveloop !
+    _leaveloop @ 0 > if                 \ if we have a leave, resolve it
+        here  _leaveloop @ !            \ This is where 'leave' wants to be
+        0 _leaveloop !
     then
-    [compile] r>   [compile] r>		\ clean up
+    [compile] r>   [compile] r>         \ clean up
     [compile] drop [compile] drop
 ; immediate
 
@@ -224,7 +224,7 @@ variable _leaveloop
 ; immediate
 
 : unloop ( -- )
-    [compile] r>   [compile] r>		\ clean up
+    [compile] r>   [compile] r>         \ clean up
     [compile] drop [compile] drop
 ; immediate
 
@@ -299,14 +299,14 @@ variable _endof
 
 : is ( xt --)
     compiling? if
-	[compile] lit
-	postpone '
-	,
-	[compile] 1+
-	[compile] @
-	[compile] !
+        [compile] lit
+        postpone '
+        ,
+        [compile] 1+
+        [compile] @
+        [compile] !
     else
-	postpone ' 1+ @ !
+        postpone ' 1+ @ !
     then
 ; immediate
 
@@ -321,6 +321,6 @@ variable _delim
     0 pad !
     next-char drop
     begin
-	next-char dup _delim @ = over 0= or if drop pad exit then
-	pad str++
+        next-char dup _delim @ = over 0= or if drop pad exit then
+        pad str++
     again ;

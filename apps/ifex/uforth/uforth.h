@@ -3,8 +3,8 @@
 /*
   uForth - A tiny ROMable 16/32-bit FORTH-like scripting language
           for microcontrollers.
-	  http://maplefish.com/todd/uforth.html
-	  Version 1.1
+          http://maplefish.com/todd/uforth.html
+          Version 1.1
 
   License for uforth 0.1 and later versions
 
@@ -36,7 +36,7 @@
 
 //typedef char bool;
 typedef enum { OK=0, E_NOT_A_WORD, E_STACK_UNDERFLOW, E_RSTACK_OVERFLOW,
-	       E_DSTACK_OVERFLOW, E_ABORT, E_EXIT } uforth_stat;
+               E_DSTACK_OVERFLOW, E_ABORT, E_EXIT } uforth_stat;
 
 #define BYTES_PER_CELL sizeof(CELL)
 #define MAX_CELL_NUM 32767
@@ -49,35 +49,35 @@ typedef enum { OK=0, E_NOT_A_WORD, E_STACK_UNDERFLOW, E_RSTACK_OVERFLOW,
   iram. 
 */
 struct uforth_iram {
-  DCELL compiling;		/* 0=interpreting, 1=colondef, 2=compiling */
-  DCELL total_ram;		/* Total ram available */
-  char* inbufptr;		/* input buffer for interpreter */
-  char* currword;		/* point to current word in inbufptr */
-  uint8_t currwordlen;		/* length of current word in inbufptr */
+  DCELL compiling;              /* 0=interpreting, 1=colondef, 2=compiling */
+  DCELL total_ram;              /* Total ram available */
+  char* inbufptr;               /* input buffer for interpreter */
+  char* currword;               /* point to current word in inbufptr */
+  uint8_t currwordlen;          /* length of current word in inbufptr */
 };
 
 struct uforth_uram {
-  DCELL len;		/* size of URAM */
-  DCELL base;			/* numeric base for I/O */
-  DCELL didx;			/* data stack index */
-  DCELL ridx;			/* return stack index */
-  DCELL dsize;			/* size of data stack */
-  DCELL rsize;			/* size of return stack */
-  DCELL ds[];		/* data & return stack */
+  DCELL len;            /* size of URAM */
+  DCELL base;                   /* numeric base for I/O */
+  DCELL didx;                   /* data stack index */
+  DCELL ridx;                   /* return stack index */
+  DCELL dsize;                  /* size of data stack */
+  DCELL rsize;                  /* size of return stack */
+  DCELL ds[];           /* data & return stack */
 };
 
 
 struct dict {
-  CELL version;			/* dictionary version number */
-  CELL max_cells;		/* MAX_DICT_CELLS */
-  CELL here;			/* top of dictionary */
-  CELL last_word_idx;		/* top word's code token (used for searches) */
-  CELL varidx;			/* keep track of next variable slot (neg #) */
+  CELL version;                 /* dictionary version number */
+  CELL max_cells;               /* MAX_DICT_CELLS */
+  CELL here;                    /* top of dictionary */
+  CELL last_word_idx;           /* top word's code token (used for searches) */
+  CELL varidx;                  /* keep track of next variable slot (neg #) */
 
-  CELL d[MAX_DICT_CELLS];	/* dictionary */
+  CELL d[MAX_DICT_CELLS];       /* dictionary */
 };
-#define DICT_HEADER_WORDS	5 /* version + max_cells + here + .. */
-#define DICT_INFO_SIZE_BYTES	(sizeof(CELL)*DICT_HEADER_WORDS)
+#define DICT_HEADER_WORDS       5 /* version + max_cells + here + .. */
+#define DICT_INFO_SIZE_BYTES    (sizeof(CELL)*DICT_HEADER_WORDS)
 
 
 /*
@@ -91,7 +91,7 @@ extern struct uforth_uram *uforth_uram;
  Abort reasons.
 */
 typedef enum { NO_ABORT=0, ABORT_CTRL_C=1, ABORT_NAW=2,
-	       ABORT_ILLEGAL=3, ABORT_WORD=4, } abort_t;
+               ABORT_ILLEGAL=3, ABORT_WORD=4, } abort_t;
 extern abort_t _uforth_abort_request;
 
 #define uforth_abort_request(why) _uforth_abort_request = why
@@ -167,4 +167,4 @@ void c_ext_init(void);
 void c_ext_create_cmds(void);
 uforth_stat c_ext_handle_cmds(CELL n);
 
-#endif	/* UFORTH_H */
+#endif  /* UFORTH_H */

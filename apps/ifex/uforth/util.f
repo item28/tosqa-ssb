@@ -1,7 +1,7 @@
 \  uForth - A tiny ROMable 16-bit FORTH-like scripting language
 \          for microcontrollers.
-\	  http://maplefish.com/todd/uforth.html
-\	  Dictionary Version 0.99
+\         http://maplefish.com/todd/uforth.html
+\         Dictionary Version 0.99
 \
 \  License for uForth 0.1 and later versions
 \
@@ -61,25 +61,25 @@
 
 : s"   compiling?
     if 
-	postpone ," ['] count , 
+        postpone ," ['] count , 
     else
-	34 word count
+        34 word count
     then
 ; immediate
 
 : c"   compiling?
     if 
-	postpone ," 
+        postpone ," 
     else
-	34 word
+        34 word
     then
 ; immediate
 
 : ."   compiling?
     if
-	postpone ," ['] count , ['] type ,
+        postpone ," ['] count , ['] type ,
     else
-	34 word count type
+        34 word count type
     then
 ; immediate
 
@@ -156,22 +156,22 @@
 
 \ Words
 \
-variable _cc			\ keep track of # of characters on a line
+variable _cc                    \ keep track of # of characters on a line
 
 : words ( -- )
     cr
     0 _cc !
-    lwa	@				\ pointer to last word
+    lwa @                               \ pointer to last word
     begin
-	dup				\ keep it on the stack 
-	\ Words look like this: 
-	\ [prevlink] [immediate/primitive name length] [name] [code] 
+        dup                             \ keep it on the stack 
+        \ Words look like this: 
+        \ [prevlink] [immediate/primitive name length] [name] [code] 
         \ name lengths are stored in the lower 6 bits -> 0x3F=63
-	1+ count 63 and dup		\ get length of word's name
-	_cc @ + 74 > if cr 0 _cc ! then \ 74 characters per line
-	dup _cc +! type 32 emit 32 emit	\ print word's name
-	2 _cc +!                        \ add in spaces
-	@				\ get prev link from last word
-	dup 0 =                        \ 0 link means no more words!
+        1+ count 63 and dup             \ get length of word's name
+        _cc @ + 74 > if cr 0 _cc ! then \ 74 characters per line
+        dup _cc +! type 32 emit 32 emit \ print word's name
+        2 _cc +!                        \ add in spaces
+        @                               \ get prev link from last word
+        dup 0 =                        \ 0 link means no more words!
     until
     drop cr ;
