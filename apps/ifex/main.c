@@ -286,35 +286,21 @@ static const SerialUSBConfig serusbcfg = {
   USBD1_INTERRUPT_REQUEST_EP
 };
 
-/*===========================================================================*/
-/* Card insertion monitor.                                                   */
-/*===========================================================================*/
+// Card insertion monitor
 
 #define POLLING_INTERVAL                10
 #define POLLING_DELAY                   10
 
-/**
- * @brief   Card monitor timer.
- */
+// Card monitor timer.
 static VirtualTimer tmr;
 
-/**
- * @brief   Debounce counter.
- */
+// Debounce counter.
 static unsigned cnt;
 
-/**
- * @brief   Card event sources.
- */
+// Card event sources.
 static EventSource inserted_event, removed_event;
 
-/**
- * @brief   Insertion monitor timer callback function.
- *
- * @param[in] p         pointer to the @p BaseBlockDevice object
- *
- * @notapi
- */
+// Insertion monitor timer callback function.
 static void tmrfunc(void *p) {
   BaseBlockDevice *bbdp = p;
 
@@ -346,13 +332,7 @@ static void tmrfunc(void *p) {
   chSysUnlockFromIsr();
 }
 
-/**
- * @brief   Polling monitor start.
- *
- * @param[in] p         pointer to an object implementing @p BaseBlockDevice
- *
- * @notapi
- */
+// Polling monitor start.
 static void tmr_init(void *p) {
 
   chEvtInit(&inserted_event);
@@ -363,18 +343,12 @@ static void tmr_init(void *p) {
   chSysUnlock();
 }
 
-/*===========================================================================*/
-/* FatFs related.                                                            */
-/*===========================================================================*/
+// FatFs related
 
-/**
- * @brief FS object.
- */
+// FS object.
 FATFS MMC_FS;
 
-/**
- * MMC driver instance.
- */
+// MMC driver instance.
 MMCDriver MMCD1;
 
 /* FS mounted and ready.*/
@@ -430,9 +404,7 @@ static FRESULT scan_files(BaseSequentialStream *chp, char *path) {
   return res;
 }
 
-/*===========================================================================*/
-/* Command line related.                                                     */
-/*===========================================================================*/
+// Command line related
 
 #define SHELL_WA_SIZE   THD_WA_SIZE(1024) // was 2048
 #define TEST_WA_SIZE    THD_WA_SIZE(256)
@@ -541,13 +513,9 @@ static const ShellConfig shell_cfg1 = {
   commands
 };
 
-/*===========================================================================*/
-/* Main and generic code.                                                    */
-/*===========================================================================*/
+// Main and generic code
 
-/*
- * Red LEDs blinker thread, times are in milliseconds.
- */
+// Red LEDs blinker thread, times are in milliseconds.
 static WORKING_AREA(waThread1, 128);
 static msg_t Thread1(void *arg) {
 
@@ -563,16 +531,12 @@ static msg_t Thread1(void *arg) {
   return 0;
 }
 
-/*
- * MMC card insertion event.
- */
+// MMC card insertion event.
 static void InsertHandler(eventid_t id) {
   FRESULT err;
 
   (void)id;
-  /*
-   * On insertion MMC initialization and FS mount.
-   */
+  // On insertion MMC initialization and FS mount.
   if (mmcConnect(&MMCD1)) {
     return;
   }
@@ -584,9 +548,7 @@ static void InsertHandler(eventid_t id) {
   fs_ready = TRUE;
 }
 
-/*
- * MMC card removal event.
- */
+// MMC card removal event.
 static void RemoveHandler(eventid_t id) {
 
   (void)id;
@@ -594,9 +556,7 @@ static void RemoveHandler(eventid_t id) {
   fs_ready = FALSE;
 }
 
-/*
- * Application entry point.
- */
+// Application entry point.
 int main(void) {
   static const evhandler_t evhndl[] = {
     InsertHandler,
@@ -605,13 +565,6 @@ int main(void) {
   Thread *shelltp = NULL;
   struct EventListener el0, el1;
 
-  /*
-   * System initializations.
-   * - HAL initialization, this also initializes the configured device drivers
-   *   and performs the board-specific initializations.
-   * - Kernel initialization, the main() function becomes a thread and the
-   *   RTOS is active.
-   */
   halInit();
   chSysInit();
 
@@ -619,52 +572,35 @@ int main(void) {
   sduObjectInit(&SDU1);
   sduStart(&SDU1, &serusbcfg);
 
-  /*
-   * Activates the USB driver and then the USB bus pull-up on D+.
-   * Note, a delay is inserted in order to not have to disconnect the cable
-   * after a reset.
-   */
+  // a delay is inserted to not have to disconnect the cable after a reset.
   usbDisconnectBus(serusbcfg.usbp);
   chThdSleepMilliseconds(1500);
   usbStart(serusbcfg.usbp, &usbcfg);
   usbConnectBus(serusbcfg.usbp);
 
-  /*
-   * Activates the serial drivers using the driver default configuration.
-   */
+  // Activates the serial drivers using the driver default configuration.
   sdStart(&SD1, NULL);
   sdStart(&SD2, NULL);
 
   chprintf((BaseSequentialStream *)&SD1, "hello 1!\r\n");
   chprintf((BaseSequentialStream *)&SD2, "hello 2!\r\n");
 
-  /*
-   * Shell manager initialization.
-   */
+  // Shell manager initialization.
   shellInit();
 
-  /*
-   * Initializes the MMC driver to work with SPI2.
-   */
+  // Initializes the MMC driver to work with SPI2.
   palSetPadMode(IOPORT2, GPIOB_SPI2NSS, PAL_MODE_OUTPUT_PUSHPULL);
   palSetPad(IOPORT2, GPIOB_SPI2NSS);
   mmcObjectInit(&MMCD1);
   mmcStart(&MMCD1, &mmccfg);
 
-  /*
-   * Activates the card insertion monitor.
-   */
+  // Activates the card insertion monitor.
   tmr_init(&MMCD1);
 
-  /*
-   * Creates the blinker thread.
-   */
+  // Creates the blinker thread.
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
 
-  /*
-   * Normal main() thread activity, in this demo it does nothing except
-   * sleeping in a loop and listen for events.
-   */
+  // sleep in a loop and listen for events.
   chEvtRegister(&inserted_event, &el0, 0);
   chEvtRegister(&removed_event, &el1, 1);
   while (TRUE) {

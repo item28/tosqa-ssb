@@ -57,13 +57,13 @@ struct uforth_iram {
 };
 
 struct uforth_uram {
-  DCELL len;            /* size of URAM */
+  DCELL len;                    /* size of URAM */
   DCELL base;                   /* numeric base for I/O */
   DCELL didx;                   /* data stack index */
   DCELL ridx;                   /* return stack index */
   DCELL dsize;                  /* size of data stack */
   DCELL rsize;                  /* size of return stack */
-  DCELL ds[];           /* data & return stack */
+  DCELL ds[];                   /* data & return stack */
 };
 
 
@@ -132,7 +132,6 @@ INLINE DCELL rpick(const DCELL n);
  Convenient short-cuts.
 */
 #define dtop() uforth_uram->ds[uforth_uram->didx]
-#define rtop() uforth_iram->rs[uforth_uram->ridx]
 
 extern void uforth_init(void);
 extern void uforth_abort(void);
