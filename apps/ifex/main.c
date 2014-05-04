@@ -582,6 +582,10 @@ int main(void) {
   sdStart(&SD1, NULL);
   sdStart(&SD2, NULL);
 
+  // fix incorrect init in board.h
+  // #define VAL_GPIOACRH            0x88844888      /* PA15...PA8 */
+  GPIOA->CRH = 0x888448B8; // PA9 = B, not 8!
+    
   chprintf((BaseSequentialStream *)&SD1, "hello 1!\r\n");
   chprintf((BaseSequentialStream *)&SD2, "hello 2!\r\n");
 
@@ -611,6 +615,8 @@ int main(void) {
       shelltp = NULL;           /* Triggers spawning of a new shell.        */
     }
     chEvtDispatch(evhndl, chEvtWaitOneTimeout(ALL_EVENTS, MS2ST(500)));
+    // chprintf((BaseSequentialStream *)&SD1, "hello?\r\n");
+    // chprintf((BaseSequentialStream *)&SD2, "hello ??\r\n");
   }
   return 0;
 }
