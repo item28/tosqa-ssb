@@ -18,13 +18,13 @@
 
 #include "ch.h"
 #include "hal.h"
-#include "test.h"
-#include "shell.h"
 #include "evtimer.h"
 #include "chprintf.h"
 #include "ff.h"
 #include "data.h"
 #include "usbconf.h"
+
+BaseSequentialStream* serio;
 
 // Card insertion monitor
 
@@ -146,36 +146,20 @@ static FRESULT scan_files(BaseSequentialStream *chp, char *path) {
 
 // Command line related
 
-#define SHELL_WA_SIZE   THD_WA_SIZE(1024) // was 2048
-#define TEST_WA_SIZE    THD_WA_SIZE(256)
-
-static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
+static void cmd_mem(void) {
   size_t n, size;
-
-  (void)argv;
-  if (argc > 0) {
-    chprintf(chp, "Usage: mem\r\n");
-    return;
-  }
   n = chHeapStatus(NULL, &size);
-  chprintf(chp, "core free memory : %u bytes\r\n", chCoreStatus());
-  chprintf(chp, "heap fragments   : %u\r\n", n);
-  chprintf(chp, "heap free total  : %u bytes\r\n", size);
+  chprintf(serio, "\r\ncore free memory : %u bytes\r\n", chCoreStatus());
+  chprintf(serio, "heap fragments   : %u\r\n", n);
+  chprintf(serio, "heap free total  : %u bytes\r\n", size);
 }
 
-static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[]) {
+static void cmd_threads(void) {
   static const char *states[] = {THD_STATE_NAMES};
-  Thread *tp;
-
-  (void)argv;
-  if (argc > 0) {
-    chprintf(chp, "Usage: threads\r\n");
-    return;
-  }
-  chprintf(chp, "    addr    stack prio refs     state time\r\n");
-  tp = chRegFirstThread();
+  chprintf(serio, "\r\n    addr    stack prio refs     state time\r\n");
+  Thread *tp = chRegFirstThread();
   do {
-    chprintf(chp, "%.8lx %.8lx %4lu %4lu %9s %lu\r\n",
+    chprintf(serio, "%.8lx %.8lx %4lu %4lu %9s %lu\r\n",
             (uint32_t)tp, (uint32_t)tp->p_ctx.r13,
             (uint32_t)tp->p_prio, (uint32_t)(tp->p_refs - 1),
             states[tp->p_state], (uint32_t)tp->p_time);
@@ -183,104 +167,39 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[]) {
   } while (tp != NULL);
 }
 
-#if TESTER
-static void cmd_test(BaseSequentialStream *chp, int argc, char *argv[]) {
-  Thread *tp;
-
-  (void)argv;
-  if (argc > 0) {
-    chprintf(chp, "Usage: test\r\n");
-    return;
-  }
-  tp = chThdCreateFromHeap(NULL, TEST_WA_SIZE, chThdGetPriority(),
-                           TestThread, chp);
-  if (tp == NULL) {
-    chprintf(chp, "out of memory\r\n");
-    return;
-  }
-  chThdWait(tp);
-}
-#endif
-
-#include "forth.h"
-
-static void cmd_uforth(BaseSequentialStream *chp, int argc, char *argv[]) {
-    (void)argc;
-    (void)argv;
-    runForth(chp, bootData);
-}
-
-static void cmd_tree(BaseSequentialStream *chp, int argc, char *argv[]) {
+static void cmd_tree(void) {
   FRESULT err;
   uint32_t clusters;
   FATFS *fsp;
-
-  (void)argv;
-  if (argc > 0) {
-    chprintf(chp, "Usage: tree\r\n");
-    return;
-  }
   if (!fs_ready) {
-    chprintf(chp, "File System not mounted\r\n");
+    chprintf(serio, "File System not mounted\r\n");
     return;
   }
   err = f_getfree("/", &clusters, &fsp);
   if (err != FR_OK) {
-    chprintf(chp, "FS: f_getfree() failed\r\n");
+    chprintf(serio, "FS: f_getfree() failed\r\n");
     return;
   }
-  chprintf(chp,
-           "FS: %lu free clusters, %lu sectors per cluster, %lu bytes free\r\n",
+  chprintf(serio,
+           "\r\nFS: %lu free clusters, %lu sectors per cluster, %lu bytes free\r\n",
            clusters, (uint32_t)MMC_FS.csize,
            clusters * (uint32_t)MMC_FS.csize * (uint32_t)MMCSD_BLOCK_SIZE);
   fbuff[0] = 0;
-  scan_files(chp, (char *)fbuff);
+  scan_files(serio, (char *)fbuff);
 }
 
-static const ShellCommand commands[] = {
-  {"mem", cmd_mem},
-  {"threads", cmd_threads},
-#if TESTER
-  {"test", cmd_test},
-#endif
-  {"tree", cmd_tree},
-  {"f", cmd_uforth},
-  {NULL, NULL}
-};
-
-static const ShellConfig shell_cfg1 = {
-  (BaseSequentialStream *)&SDU1,
-  commands
-};
+#include "forth.h"
 
 // Main and generic code
 
-// Red LEDs blinker thread, times are in milliseconds.
-static WORKING_AREA(waThread1, 128);
-static msg_t Thread1(void *arg) {
-
-  (void)arg;
-  chRegSetThreadName("blinker");
-  while (TRUE) {
-    palTogglePad(IOPORT3, GPIOC_LED);
-    if (fs_ready)
-      chThdSleepMilliseconds(200);
-    else
-      chThdSleepMilliseconds(500);
-  }
-  return 0;
-}
-
 // MMC card insertion event.
 static void InsertHandler(eventid_t id) {
-  FRESULT err;
-
   (void)id;
   // On insertion MMC initialization and FS mount.
   if (mmcConnect(&MMCD1)) {
     return;
   }
-  err = f_mount(0, &MMC_FS);
+  FRESULT err = f_mount(0, &MMC_FS);
   if (err != FR_OK) {
     mmcDisconnect(&MMCD1);
     return;
@@ -290,10 +209,22 @@ static void InsertHandler(eventid_t id) {
 
 // MMC card removal event.
 static void RemoveHandler(eventid_t id) {
-
   (void)id;
   mmcDisconnect(&MMCD1);
   fs_ready = FALSE;
+}
+
+// Forth command thread
+
+static WORKING_AREA(waCommand, 1024);
+static msg_t command (void *arg) {
+  (void)arg;
+  chRegSetThreadName("command");
+  while (TRUE) {
+    chThdSleepMilliseconds(500); // avoid startup stutter and runaway loops
+    runForth(bootData);
+  }
+  return 0;
 }
 
 // Application entry point.
@@ -302,7 +233,6 @@ int main(void) {
     InsertHandler,
     RemoveHandler
   };
-  Thread *shelltp = NULL;
   struct EventListener el0, el1;
 
   halInit();
@@ -313,10 +243,10 @@ int main(void) {
   sduStart(&SDU1, &serusbcfg);
 
   // a delay is inserted to not have to disconnect the cable after a reset.
-  usbDisconnectBus(serusbcfg.usbp);
-  chThdSleepMilliseconds(1500);
-  usbStart(serusbcfg.usbp, &usbcfg);
-  usbConnectBus(serusbcfg.usbp);
+  // usbDisconnectBus(serusbcfg.usbp);
+  // chThdSleepMilliseconds(1500);
+  // usbStart(serusbcfg.usbp, &usbcfg);
+  // usbConnectBus(serusbcfg.usbp);
 
   // Activates the serial drivers using the driver default configuration.
   sdStart(&SD1, NULL);
@@ -326,11 +256,11 @@ int main(void) {
   // #define VAL_GPIOACRH            0x88844888      /* PA15...PA8 */
   GPIOA->CRH = 0x888448B8; // PA9 = B, not 8!
     
-  chprintf((BaseSequentialStream *)&SD1, "hello 1!\r\n");
-  chprintf((BaseSequentialStream *)&SD2, "hello 2!\r\n");
+  // chprintf((BaseSequentialStream *)&SDU1, "hello USB!\r\n");
+  // chprintf((BaseSequentialStream *)&SD1, "hello 1!\r\n");
+  // chprintf((BaseSequentialStream *)&SD2, "hello 2!\r\n");
 
-  // Shell manager initialization.
-  shellInit();
+  serio = (BaseSequentialStream *)&SD1;
 
   // Initializes the MMC driver to work with SPI2.
   palSetPadMode(IOPORT2, GPIOB_SPI2NSS, PAL_MODE_OUTPUT_PUSHPULL);
@@ -341,22 +271,40 @@ int main(void) {
   // Activates the card insertion monitor.
   tmr_init(&MMCD1);
 
-  // Creates the blinker thread.
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
+  // Creates the command thread.
+  chThdCreateStatic(waCommand, sizeof(waCommand), NORMALPRIO, command, NULL);
 
-  // sleep in a loop and listen for events.
+  // sleep in a loop, listen for events, blink led, and check button
   chEvtRegister(&inserted_event, &el0, 0);
   chEvtRegister(&removed_event, &el1, 1);
+  int led = 0;
   while (TRUE) {
-    if (!shelltp)
-      shelltp = shellCreate(&shell_cfg1, SHELL_WA_SIZE, NORMALPRIO);
-    else if (chThdTerminated(shelltp)) {
-      chThdRelease(shelltp);    /* Recovers memory of the previous shell.   */
-      shelltp = NULL;           /* Triggers spawning of a new shell.        */
+    chEvtDispatch(evhndl, chEvtWaitOneTimeout(ALL_EVENTS, MS2ST(100)));
+
+    if (++led >= 5) {
+      led = 0;
+      palTogglePad(IOPORT3, GPIOC_LED);
     }
-    chEvtDispatch(evhndl, chEvtWaitOneTimeout(ALL_EVENTS, MS2ST(500)));
-    // chprintf((BaseSequentialStream *)&SD1, "hello?\r\n");
-    // chprintf((BaseSequentialStream *)&SD2, "hello ??\r\n");
+    
+    if (palReadPad(IOPORT1, GPIOA_BUTTON)) {
+      palClearPad(IOPORT1, GPIOA_BUTTON);
+      if (serio == (BaseSequentialStream *)&SD1) {        // SD1 -> SD2
+        serio = (BaseSequentialStream *)&SD2;
+      } else if (serio == (BaseSequentialStream *)&SD2) { // SD2 -> SDU1
+        palSetPad(IOPORT1, GPIOA_BUTTON);
+        serio = (BaseSequentialStream *)&SDU1;
+        usbStart(serusbcfg.usbp, &usbcfg);
+        usbConnectBus(serusbcfg.usbp);
+      } else {                                            // SDU1 -> SD1
+        usbStop(serusbcfg.usbp);
+        usbDisconnectBus(serusbcfg.usbp);
+        serio = (BaseSequentialStream *)&SD1;
+      }
+      chprintf(serio, "[ifex] OK\r\n");
+      
+      while (palReadPad(IOPORT1, GPIOA_BUTTON))
+        chThdYield();
+    }
   }
   return 0;
 }

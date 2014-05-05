@@ -14,4 +14,8 @@
 #define UF_CMEM_AT              11      // cmem@ ( addr -- )
 #define UF_CMEM_STORE           12      // cmem! ( val addr -- )
 #define UF_INCLUDE              24      // include ( <filename> -- )
+
+#define UF_MEM                  30      // mem ( -- )
+#define UF_THREADS              31      // threads ( -- )
+#define UF_TREE                 32      // tree ( -- )
 #endif  /* UF_UFORTH_EXT_H */

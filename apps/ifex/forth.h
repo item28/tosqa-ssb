@@ -6,18 +6,16 @@ struct dict *dict;
 #include "uforth/uforth-ext.c"
 #include "uforth/utils.c"
 
-BaseSequentialStream* serio;
-
 static bool_t getLine(char *line, unsigned size) {
   char *p = line;
 
   while (TRUE) {
     char c;
 
-    if (chSequentialStreamRead(serio, (uint8_t *)&c, 1) == 0)
-      return TRUE;
+    // use timeouts so serio can be switched in mid-flight
+    while (chnReadTimeout((BaseChannel*) serio, (uint8_t *)&c, 1, 1000) == 0)
+      ;
     if (c == 4) {
-      chprintf(serio, "^D");
       return TRUE;
     }
     if (c == 8 || c == 127) {
@@ -43,9 +41,8 @@ static bool_t getLine(char *line, unsigned size) {
   }
 }
 
-void runForth(BaseSequentialStream* chp, const uint8_t* romdict) {
+static void runForth(const uint8_t* romdict) {
   dict = (struct dict*) romdict;
-  serio = chp;
   uforth_init();
   c_ext_init();
   static uint8_t buf[100];
@@ -104,6 +101,15 @@ uforth_stat c_handle(void) {
       str = (uint8_t*)&(uforth_dict[r2]);
     }
     chSequentialStreamWrite(serio, str, r1);
+    break;
+  case UF_MEM:
+    cmd_mem();
+    break;
+  case UF_THREADS:
+    cmd_threads();
+    break;
+  case UF_TREE:
+    cmd_tree();
     break;
   default:
     return c_ext_handle_cmds(r1);
