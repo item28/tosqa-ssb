@@ -238,10 +238,6 @@ int main(void) {
   halInit();
   chSysInit();
 
-  // Initializes a serial-over-USB CDC driver.
-  sduObjectInit(&SDU1);
-  sduStart(&SDU1, &serusbcfg);
-
   // a delay is inserted to not have to disconnect the cable after a reset.
   // usbDisconnectBus(serusbcfg.usbp);
   // chThdSleepMilliseconds(1500);
@@ -292,12 +288,16 @@ int main(void) {
         serio = (BaseSequentialStream *)&SD2;
       } else if (serio == (BaseSequentialStream *)&SD2) { // SD2 -> SDU1
         palSetPad(IOPORT1, GPIOA_BUTTON);
-        serio = (BaseSequentialStream *)&SDU1;
+        // Initializes a serial-over-USB CDC driver.
+        sduObjectInit(&SDU1);
+        sduStart(&SDU1, &serusbcfg);
         usbStart(serusbcfg.usbp, &usbcfg);
         usbConnectBus(serusbcfg.usbp);
+        serio = (BaseSequentialStream *)&SDU1;
       } else {                                            // SDU1 -> SD1
         usbStop(serusbcfg.usbp);
         usbDisconnectBus(serusbcfg.usbp);
+        sduStop(&SDU1);
         serio = (BaseSequentialStream *)&SD1;
       }
       chprintf(serio, "[ifex] OK\r\n");

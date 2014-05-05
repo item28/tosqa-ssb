@@ -13,6 +13,6 @@
 : cmem@ ( addr -- )   11 cf ;
 : cmem! ( val addr -- )   12 cf ;
 : include ( <filename> -- )   24 cf ;
-: mem ( -- )   30 cf ;
+: chmem ( -- )   30 cf ;
 : threads ( -- )   31 cf ;
 : tree ( -- )   32 cf ;

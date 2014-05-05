@@ -102,7 +102,25 @@ uforth_stat c_handle(void) {
     }
     chSequentialStreamWrite(serio, str, r1);
     break;
-  case UF_MEM:
+  case UF_MEM_AT:
+    r1 = dpop();
+    dpush(*(int*)r1);
+    break;
+  case UF_MEM_STORE:
+    r1 = dpop();
+    r2 = dpop();
+    *(int*)r1 = r2;
+    break;
+  case UF_CMEM_AT:
+    r1 = dpop();
+    dpush(*(uint8_t*)r1);
+    break;
+  case UF_CMEM_STORE:
+    r1 = dpop();
+    r2 = dpop();
+    *(uint8_t*)r1 = r2;
+    break;
+  case UF_CHMEM:
     cmd_mem();
     break;
   case UF_THREADS:
