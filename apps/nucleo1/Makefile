@@ -58,7 +58,7 @@ endif
 PROJECT = ch
 
 # Imported source files and paths
-CHIBIOS = ../../../../ChibiOS/ChibiOS-RT
+CHIBIOS = ../../ChibiOS-RT
 include $(CHIBIOS)/boards/OLIMEX_STM32_P103/board.mk
 include $(CHIBIOS)/os/hal/platforms/STM32F1xx/platform.mk
 include $(CHIBIOS)/os/hal/hal.mk

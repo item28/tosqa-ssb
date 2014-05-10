@@ -5,7 +5,7 @@ USE_VERBOSE_COMPILE = no
 
 PROJECT = min
 
-CHIBIOS = ../../../../ChibiOS/ChibiOS-RT
+CHIBIOS = ../../ChibiOS-RT
 
 PORTLD  = $(CHIBIOS)/os/ports/GCC/ARMCMx/LPC11xx/ld
 

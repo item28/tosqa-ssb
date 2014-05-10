@@ -53,7 +53,7 @@ endif
 PROJECT = ssb
 
 # Imported source files
-CHIBIOS = ../../../../ChibiOS/ChibiOS-RT
+CHIBIOS = ../../ChibiOS-RT
 include $(CHIBIOS)/os/hal/platforms/LPC11xx/platform.mk
 include $(CHIBIOS)/os/hal/hal.mk
 include $(CHIBIOS)/os/ports/GCC/ARMCMx/LPC11xx/port.mk

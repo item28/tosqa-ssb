@@ -53,7 +53,7 @@ endif
 PROJECT = aoanet
 
 # Imported source files and paths
-CHIBIOS = ../../../../ChibiOS/ChibiOS-RT
+CHIBIOS = ../../ChibiOS-RT
 # include $(CHIBIOS)/boards/EA_LPCXPRESSO_LPC1769/board.mk
 include $(CHIBIOS)/os/hal/platforms/LPC17xx/platform.mk
 include $(CHIBIOS)/os/hal/hal.mk
