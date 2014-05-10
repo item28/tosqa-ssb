@@ -35,6 +35,7 @@ static void canBusInit ();
 static void motionInit ();
 static void motionParams (const MotionParams& p);
 static void motionTarget (const Setpoint& s);
+static int motionPosition ();
 static uint8_t motionStatus ();
 static void motionStop ();
 static void setpointInit ();
@@ -70,12 +71,16 @@ static void processIncomingRequest () {
 static void reportQueueAndStatus () {
     if (canBus.shortId == 0)
         return; // no assigned ID, can't send report packets out
+    int pos = motionPosition();
     CCAN_MSG_OBJ_T txMsg;
     txMsg.msgobj = 10;
     txMsg.mode_id = 0x100 | canBus.shortId;
-    txMsg.dlc = 2;
+    txMsg.dlc = 5;
     txMsg.data[0] = chMBGetFreeCountI(&setpoint.mailbox);
-    txMsg.data[1] = motionStatus();
+    txMsg.data[1] = pos;
+    txMsg.data[2] = pos >> 8;
+    txMsg.data[3] = pos >> 16;
+    txMsg.data[4] = motionStatus();
     LPC_CCAN_API->can_transmit(&txMsg);
 }
 

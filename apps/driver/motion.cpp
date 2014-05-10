@@ -41,7 +41,7 @@ void motionInit () {
 }
 
 // return the current position of the stepper motor in steps
-static int currentStep () {
+int motionPosition () {
     // if there are still steps to go, then target position hasn't been reached
     return motion.targetStep - motion.direction * motion.stepsToGo;
 }
@@ -75,7 +75,7 @@ void motionTarget (const Setpoint& s) {
     // determine target step to end on, rounding from a 24.8 to a 24.0 int
     int target = posToStep(s.position);
     if (s.relative)
-        target += currentStep();
+        target += motionPosition();
     
     // enforce soft position limits
     if (target < posToStep(motion.params.minPos)) {
@@ -88,7 +88,7 @@ void motionTarget (const Setpoint& s) {
     }
     
     // set the next target
-    int stepDiff = target - currentStep();
+    int stepDiff = target - motionPosition();
     motion.direction = stepDiff > 0 ? 1 : -1;
     motion.stepsToGo = stepDiff * motion.direction;
     motion.targetStep = target;
