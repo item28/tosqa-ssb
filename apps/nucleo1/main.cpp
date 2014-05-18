@@ -21,11 +21,12 @@
 
 using namespace chibios_rt;
 
+#define   GPIOA_LED     5
+#define   GPIOC_BUTTON  13
+
 /*
  * LED blink sequences.
  * NOTE: Sequences must always be terminated by a GOTO instruction.
- * NOTE: The sequencer language could be easily improved but this is outside
- *       the scope of this demo.
  */
 #define SLEEP           0
 #define GOTO            1
@@ -41,37 +42,32 @@ typedef struct {
 // Flashing sequence for LED1.
 static const seqop_t LED1_sequence[] =
 {
-  {BITCLEAR, PAL_PORT_BIT(GPIOC_LED)},
+  {BITCLEAR, PAL_PORT_BIT(GPIOA_LED)},
   {SLEEP,    200},
-  {BITSET,   PAL_PORT_BIT(GPIOC_LED)},
+  {BITSET,   PAL_PORT_BIT(GPIOA_LED)},
   {SLEEP,    800},
-  {BITCLEAR, PAL_PORT_BIT(GPIOC_LED)},
+  {BITCLEAR, PAL_PORT_BIT(GPIOA_LED)},
   {SLEEP,    400},
-  {BITSET,   PAL_PORT_BIT(GPIOC_LED)},
+  {BITSET,   PAL_PORT_BIT(GPIOA_LED)},
   {SLEEP,    600},
-  {BITCLEAR, PAL_PORT_BIT(GPIOC_LED)},
+  {BITCLEAR, PAL_PORT_BIT(GPIOA_LED)},
   {SLEEP,    600},
-  {BITSET,   PAL_PORT_BIT(GPIOC_LED)},
+  {BITSET,   PAL_PORT_BIT(GPIOA_LED)},
   {SLEEP,    400},
-  {BITCLEAR, PAL_PORT_BIT(GPIOC_LED)},
+  {BITCLEAR, PAL_PORT_BIT(GPIOA_LED)},
   {SLEEP,    800},
-  {BITSET,   PAL_PORT_BIT(GPIOC_LED)},
+  {BITSET,   PAL_PORT_BIT(GPIOA_LED)},
   {SLEEP,    200},
   {GOTO,     0}
 };
 
-/*
- * Sequencer thread class. It can drive LEDs or other output pins.
- * Any sequencer is just an instance of this class, all the details are
- * totally encapsulated and hidden to the application level.
- */
+// Sequencer thread class. It can drive LEDs or other output pins.
 class SequencerThread : public BaseStaticThread<128> {
 private:
   const seqop_t *base, *curr;                   // Thread local variables.
 
 protected:
   virtual msg_t main(void) {
-    palSetGroupMode(GPIOA, PAL_PORT_BIT(5), 0, PAL_MODE_OUTPUT_PUSHPULL);
     while (true) {
       switch(curr->action) {
       case SLEEP:
@@ -83,10 +79,10 @@ protected:
       case STOP:
         return 0;
       case BITCLEAR:
-        palClearPad(GPIOA, 5);
+        palClearPort(GPIOA, curr->value);
         break;
       case BITSET:
-        palSetPad(GPIOA, 5);
+        palSetPort(GPIOA, curr->value);
         break;
       }
       curr++;
@@ -101,9 +97,7 @@ public:
   }
 };
 
-/*
- * Tester thread class. This thread executes the test suite.
- */
+// Tester thread class. This thread executes the test suite.
 class TesterThread : public BaseStaticThread<256> {
 
 protected:
@@ -126,36 +120,20 @@ static SequencerThread blinker1(LED1_sequence);
 /*
  * Application entry point.
  */
-int main(void) {
-
-  /*
-   * System initializations.
-   * - HAL initialization, this also initializes the configured device drivers
-   *   and performs the board-specific initializations.
-   * - Kernel initialization, the main() function becomes a thread and the
-   *   RTOS is active.
-   */
+int main () {
   halInit();
   System::init();
 
-  /*
-   * Activates the serial driver 2 using the driver default configuration.
-   */
+  palSetGroupMode(GPIOA, PAL_PORT_BIT(GPIOA_LED), 0, PAL_MODE_OUTPUT_PUSHPULL);
+  palSetGroupMode(GPIOC, PAL_PORT_BIT(GPIOC_BUTTON), 0, PAL_MODE_INPUT);
+  
   sdStart(&SD2, NULL);
   chprintf((BaseSequentialStream *)&SD2, "Hello!\r\n");
 
-  /*
-   * Starts several instances of the SequencerThread class, each one operating
-   * on a different LED.
-   */
   blinker1.start(NORMALPRIO + 10);
 
-  /*
-   * Serves timer events.
-   */
-  palSetGroupMode(GPIOC, PAL_PORT_BIT(13), 0, PAL_MODE_INPUT);
   while (true) {
-    if (!palReadPad(GPIOC, 13)) {
+    if (!palReadPad(GPIOC, GPIOC_BUTTON)) {
       tester.start(NORMALPRIO);
       tester.wait();
     };
