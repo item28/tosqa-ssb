@@ -23,6 +23,8 @@
 
 using namespace chibios_rt;
 
+// #define TESTER 1
+
 #define GPIOA_LED     5
 #define GPIOC_BUTTON  13
 #define GPIOB_CAN_RX  8   // alt mode 0b10
@@ -74,20 +76,11 @@ protected:
   virtual msg_t main(void) {
     while (true) {
       switch(curr->action) {
-      case SLEEP:
-        sleep(curr->value);
-        break;
-      case GOTO:
-        curr = &base[curr->value];
-        continue;
-      case STOP:
-        return 0;
-      case BITCLEAR:
-        palClearPort(GPIOA, curr->value);
-        break;
-      case BITSET:
-        palSetPort(GPIOA, curr->value);
-        break;
+        case SLEEP:    sleep(curr->value); break;
+        case GOTO:     curr = &base[curr->value]; continue;
+        case STOP:     return 0;
+        case BITCLEAR: palClearPort(GPIOA, curr->value); break;
+        case BITSET:   palSetPort(GPIOA, curr->value); break;
       }
       curr++;
     }
@@ -96,26 +89,24 @@ protected:
 
 public:
   SequencerThread(const seqop_t *sequence) : BaseStaticThread<128>() {
-
     base = curr = sequence;
   }
 };
 
-// // Tester thread class. This thread executes the test suite.
-// class TesterThread : public BaseStaticThread<256> {
-// 
-// protected:
-//   virtual msg_t main(void) {
-// 
-//     setName("tester");
-// 
-//     return TestThread(&SD2);
-//   }
-// 
-// public:
-//   TesterThread(void) : BaseStaticThread<256>() {
-//   }
-// };
+#if TESTER
+// Tester thread class. This thread executes the test suite.
+class TesterThread : public BaseStaticThread<256> {
+
+protected:
+  virtual msg_t main(void) {
+    setName("tester");
+    return TestThread(&SD2);
+  }
+
+public:
+  TesterThread(void) : BaseStaticThread<256>() {}
+};
+#endif
 
 static char* appendHex (char *p, uint8_t v) {
   const char* hex = "0123456789ABCDEF";
@@ -129,9 +120,7 @@ class CanRecvThread : public BaseStaticThread<256> {
 
 protected:
   virtual msg_t main(void) {
-
     setName("canrecv");
-
     CANRxFrame rxMsg;
 
     while(!chThdShouldTerminate()) {
@@ -154,8 +143,7 @@ protected:
   }
 
 public:
-  CanRecvThread(void) : BaseStaticThread<256>() {
-  }
+  CanRecvThread(void) : BaseStaticThread<256>() {}
 };
 
 // CAN send thread class.
@@ -163,7 +151,6 @@ class CanSendThread : public BaseStaticThread<256> {
 
 protected:
   virtual msg_t main(void) {
-
     setName("cansend");
 
     CANTxFrame txmsg_can1;
@@ -184,12 +171,13 @@ protected:
   }
 
 public:
-  CanSendThread(void) : BaseStaticThread<256>() {
-  }
+  CanSendThread(void) : BaseStaticThread<256>() {}
 };
 
-/* Static threads instances.*/
-// static TesterThread tester;
+// Static threads instances
+#if TESTER
+static TesterThread tester;
+#endif
 static CanRecvThread canReceiver;
 static CanSendThread canSender;
 static SequencerThread blinker1(LED1_sequence);
@@ -202,14 +190,14 @@ int main () {
   palSetGroupMode(GPIOA, PAL_PORT_BIT(GPIOA_LED), 0, PAL_MODE_OUTPUT_PUSHPULL);
   palSetGroupMode(GPIOC, PAL_PORT_BIT(GPIOC_BUTTON), 0, PAL_MODE_INPUT);
   
-  AFIO->MAPR = (AFIO->MAPR & ~(3<<13)) | (2<<13); // CAN RX/TX on PB8/PB9
+  AFIO->MAPR = (AFIO->MAPR & ~(0b11<<13)) | (0b10<<13); // CAN RX/TX on PB8/PB9
   palSetGroupMode(GPIOB, PAL_PORT_BIT(GPIOB_CAN_RX), 0, PAL_MODE_INPUT);
   palSetGroupMode(GPIOB, PAL_PORT_BIT(GPIOB_CAN_TX), 0, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
   
   sdStart(&SD2, NULL);
-  chprintf((BaseSequentialStream *)&SD2, "Hello!\r\n");
+  chprintf((BaseSequentialStream *)&SD2, "\r\n[nucleo1]\r\n");
 
-  // Activates CAN driver 1.
+  // Activates CAN driver.
   static const CANConfig cancfg = {
     CAN_MCR_ABOM | CAN_MCR_AWUM | CAN_MCR_TXFP,
     CAN_BTR_SJW(1) | CAN_BTR_TS2(2) |
@@ -219,15 +207,16 @@ int main () {
   
   canReceiver.start(NORMALPRIO);
   canSender.start(NORMALPRIO);
-
   blinker1.start(NORMALPRIO + 10);
 
   while (true) {
-    // if (!palReadPad(GPIOC, GPIOC_BUTTON)) {
-    //   tester.start(NORMALPRIO);
-    //   tester.wait();
-    // };
-    BaseThread::sleep(MS2ST(500));
+#if TESTER
+    if (!palReadPad(GPIOC, GPIOC_BUTTON)) {
+      tester.start(NORMALPRIO);
+      tester.wait();
+    };
+#endif
+    BaseThread::sleep(100);
   }
 
   return 0;
