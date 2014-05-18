@@ -19,6 +19,7 @@ Brief description of the applications in this area:
 * **nete407** - test application for the Olimex STM32-E407 board
 * **nucleo1** - test application for the STM32 Nucleo F103 board
 * **olip103** - test application for the Olimex STM32-P103 board
+* **peeklcd** - show last 60 CAN bus messages on LCD display (using uGFX)
 * **pwmstep** - a first test to drive the stepper motor from PWM
 * **rampstep** - drive the stepper motor from PWM with linear ramping
 * **rotaries** - interface two rotary encoders to the CAN bus
