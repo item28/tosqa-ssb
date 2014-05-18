@@ -30,6 +30,8 @@ using namespace chibios_rt;
 #define GPIOB_CAN_RX  8   // alt mode 0b10
 #define GPIOB_CAN_TX  9   // alt mode 0b10
 
+BaseSequentialStream *serial = (BaseSequentialStream*)&SD2;
+  
 /*
  * LED blink sequences.
  * NOTE: Sequences must always be terminated by a GOTO instruction.
@@ -123,7 +125,7 @@ protected:
     setName("canrecv");
     CANRxFrame rxMsg;
 
-    while(!chThdShouldTerminate()) {
+    while(true) {
       while (canReceive(&CAND1, CAN_ANY_MAILBOX, &rxMsg, 100) == RDY_OK) {
         char buf [30];
         uint32_t id = rxMsg.EID;
@@ -135,7 +137,7 @@ protected:
         for (i = 0; i < rxMsg.DLC; ++i)
           p = appendHex(p, rxMsg.data8[i]);
         strcpy(p, "\r\n");
-        chprintf((BaseSequentialStream *)&SD2, buf);
+        chprintf(serial, buf);
       }
     }
 
@@ -147,6 +149,13 @@ public:
 };
 
 // CAN send thread class.
+
+static uint8_t hexDigit (char c) {
+    if (c > '9')
+        c -= 7;
+    return c & 0xF;
+}
+
 class CanSendThread : public BaseStaticThread<256> {
 
 protected:
@@ -154,17 +163,41 @@ protected:
     setName("cansend");
 
     CANTxFrame txmsg_can1;
-    chRegSetThreadName("transmitter");
-    txmsg_can1.IDE = CAN_IDE_STD;
-    txmsg_can1.EID = 0x234;
     txmsg_can1.RTR = CAN_RTR_DATA;
-    txmsg_can1.DLC = 1;
-    txmsg_can1.data8[0] = 0;
   
-    while (!chThdShouldTerminate()) {
-      ++txmsg_can1.data8[0];
-      canTransmit(&CAND1, 1, &txmsg_can1, 100);
-      sleep(300);
+    uint8_t nibble = 0;
+    enum { sNONE, sADDR, sDATA } state = sNONE;
+
+    while (true) {
+      char ch = chSequentialStreamGet(serial);
+
+      switch (state) {
+      case sNONE:
+          if (ch == 'S') {
+              state = sADDR;
+              txmsg_can1.EID = 0;
+          }
+          break;
+      case sADDR:
+          if (ch == '#') {
+              state = sDATA;
+              nibble = 0;
+          } else {
+              txmsg_can1.EID = (txmsg_can1.EID << 4) | hexDigit(ch);
+          }
+          break;
+      case sDATA:
+          if (ch >= '0') {
+              uint8_t* p = txmsg_can1.data8 + nibble/2;
+              *p = (*p << 4) | hexDigit(ch);
+              ++nibble;
+          } else {
+              txmsg_can1.IDE = txmsg_can1.EID > 0x7FF ? CAN_IDE_EXT : CAN_IDE_STD;
+              txmsg_can1.DLC = nibble / 2;
+              canTransmit(&CAND1, 1, &txmsg_can1, 100);
+              state = sNONE;
+          }
+      }
     }
 
     return 0;
@@ -195,7 +228,7 @@ int main () {
   palSetGroupMode(GPIOB, PAL_PORT_BIT(GPIOB_CAN_TX), 0, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
   
   sdStart(&SD2, NULL);
-  chprintf((BaseSequentialStream *)&SD2, "\r\n[nucleo1]\r\n");
+  chprintf(serial, "\r\n[nucleo1]\r\n");
 
   // Activates CAN driver.
   static const CANConfig cancfg = {
