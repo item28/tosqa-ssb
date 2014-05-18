@@ -17,6 +17,7 @@
 #include "ch.hpp"
 #include "hal.h"
 #include "test.h"
+#include "chprintf.h"
 
 using namespace chibios_rt;
 
@@ -70,6 +71,7 @@ private:
 
 protected:
   virtual msg_t main(void) {
+    palSetGroupMode(GPIOA, PAL_PORT_BIT(5), 0, PAL_MODE_OUTPUT_PUSHPULL);
     while (true) {
       switch(curr->action) {
       case SLEEP:
@@ -81,14 +83,15 @@ protected:
       case STOP:
         return 0;
       case BITCLEAR:
-        palClearPort(GPIOC, curr->value);
+        palClearPad(GPIOA, 5);
         break;
       case BITSET:
-        palSetPort(GPIOC, curr->value);
+        palSetPad(GPIOA, 5);
         break;
       }
       curr++;
     }
+    return 0;
   }
 
 public:
@@ -139,6 +142,7 @@ int main(void) {
    * Activates the serial driver 2 using the driver default configuration.
    */
   sdStart(&SD2, NULL);
+  chprintf((BaseSequentialStream *)&SD2, "Hello!\r\n");
 
   /*
    * Starts several instances of the SequencerThread class, each one operating
@@ -149,8 +153,9 @@ int main(void) {
   /*
    * Serves timer events.
    */
+  palSetGroupMode(GPIOC, PAL_PORT_BIT(13), 0, PAL_MODE_INPUT);
   while (true) {
-    if (palReadPad(GPIOA, GPIOA_BUTTON)) {
+    if (!palReadPad(GPIOC, 13)) {
       tester.start(NORMALPRIO);
       tester.wait();
     };
