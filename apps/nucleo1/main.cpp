@@ -14,6 +14,8 @@
     limitations under the License.
 */
 
+#include <string.h>
+
 #include "ch.hpp"
 #include "hal.h"
 #include "test.h"
@@ -21,8 +23,10 @@
 
 using namespace chibios_rt;
 
-#define   GPIOA_LED     5
-#define   GPIOC_BUTTON  13
+#define GPIOA_LED     5
+#define GPIOC_BUTTON  13
+#define GPIOB_CAN_RX  8   // alt mode 0b10
+#define GPIOB_CAN_TX  9   // alt mode 0b10
 
 /*
  * LED blink sequences.
@@ -97,29 +101,100 @@ public:
   }
 };
 
-// Tester thread class. This thread executes the test suite.
-class TesterThread : public BaseStaticThread<256> {
+// // Tester thread class. This thread executes the test suite.
+// class TesterThread : public BaseStaticThread<256> {
+// 
+// protected:
+//   virtual msg_t main(void) {
+// 
+//     setName("tester");
+// 
+//     return TestThread(&SD2);
+//   }
+// 
+// public:
+//   TesterThread(void) : BaseStaticThread<256>() {
+//   }
+// };
+
+static char* appendHex (char *p, uint8_t v) {
+  const char* hex = "0123456789ABCDEF";
+  *p++ = hex[v>>4];
+  *p++ = hex[v&0x0F];
+  return p;
+}
+
+// CAN receive thread class.
+class CanRecvThread : public BaseStaticThread<256> {
 
 protected:
   virtual msg_t main(void) {
 
-    setName("tester");
+    setName("canrecv");
 
-    return TestThread(&SD2);
+    CANRxFrame rxMsg;
+
+    while(!chThdShouldTerminate()) {
+      while (canReceive(&CAND1, CAN_ANY_MAILBOX, &rxMsg, 100) == RDY_OK) {
+        char buf [30];
+        uint32_t id = rxMsg.EID;
+        if (!rxMsg.IDE)
+          id &= 0x7FF;
+        chsnprintf(buf, sizeof buf, "S%x#", id);
+        char* p = buf + strlen(buf);
+        int i;
+        for (i = 0; i < rxMsg.DLC; ++i)
+          p = appendHex(p, rxMsg.data8[i]);
+        strcpy(p, "\r\n");
+        chprintf((BaseSequentialStream *)&SD2, buf);
+      }
+    }
+
+    return 0;
   }
 
 public:
-  TesterThread(void) : BaseStaticThread<256>() {
+  CanRecvThread(void) : BaseStaticThread<256>() {
+  }
+};
+
+// CAN send thread class.
+class CanSendThread : public BaseStaticThread<256> {
+
+protected:
+  virtual msg_t main(void) {
+
+    setName("cansend");
+
+    CANTxFrame txmsg_can1;
+    chRegSetThreadName("transmitter");
+    txmsg_can1.IDE = CAN_IDE_STD;
+    txmsg_can1.EID = 0x234;
+    txmsg_can1.RTR = CAN_RTR_DATA;
+    txmsg_can1.DLC = 1;
+    txmsg_can1.data8[0] = 0;
+  
+    while (!chThdShouldTerminate()) {
+      ++txmsg_can1.data8[0];
+      canTransmit(&CAND1, 1, &txmsg_can1, 100);
+      sleep(300);
+    }
+
+    return 0;
+  }
+
+public:
+  CanSendThread(void) : BaseStaticThread<256>() {
   }
 };
 
 /* Static threads instances.*/
-static TesterThread tester;
+// static TesterThread tester;
+static CanRecvThread canReceiver;
+static CanSendThread canSender;
 static SequencerThread blinker1(LED1_sequence);
 
-/*
- * Application entry point.
- */
+// Application entry point.
 int main () {
   halInit();
   System::init();
@@ -127,16 +202,31 @@ int main () {
   palSetGroupMode(GPIOA, PAL_PORT_BIT(GPIOA_LED), 0, PAL_MODE_OUTPUT_PUSHPULL);
   palSetGroupMode(GPIOC, PAL_PORT_BIT(GPIOC_BUTTON), 0, PAL_MODE_INPUT);
   
+  AFIO->MAPR = (AFIO->MAPR & ~(3<<13)) | (2<<13); // CAN RX/TX on PB8/PB9
+  palSetGroupMode(GPIOB, PAL_PORT_BIT(GPIOB_CAN_RX), 0, PAL_MODE_INPUT);
+  palSetGroupMode(GPIOB, PAL_PORT_BIT(GPIOB_CAN_TX), 0, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
+  
   sdStart(&SD2, NULL);
   chprintf((BaseSequentialStream *)&SD2, "Hello!\r\n");
+
+  // Activates CAN driver 1.
+  static const CANConfig cancfg = {
+    CAN_MCR_ABOM | CAN_MCR_AWUM | CAN_MCR_TXFP,
+    CAN_BTR_SJW(1) | CAN_BTR_TS2(2) |
+    CAN_BTR_TS1(7) | CAN_BTR_BRP(2)
+  };
+  canStart(&CAND1, &cancfg);
+  
+  canReceiver.start(NORMALPRIO);
+  canSender.start(NORMALPRIO);
 
   blinker1.start(NORMALPRIO + 10);
 
   while (true) {
-    if (!palReadPad(GPIOC, GPIOC_BUTTON)) {
-      tester.start(NORMALPRIO);
-      tester.wait();
-    };
+    // if (!palReadPad(GPIOC, GPIOC_BUTTON)) {
+    //   tester.start(NORMALPRIO);
+    //   tester.wait();
+    // };
     BaseThread::sleep(MS2ST(500));
   }
 
