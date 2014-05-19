@@ -18,7 +18,7 @@ Brief description of the applications in this area:
 * **minimal** - absolutely minimal blinker, no ChibiOS or other libs
 * **netdemo** - test application for the AOAA board's LPC1769
 * **nete407** - test application for the Olimex STM32-E407 board
-* **nucleo1** - test application for the STM32 Nucleo F103 board
+* **nucleo1** - CAN to serial USB bridge for the STM32 Nucleo F103 board
 * **olip103** - test application for the Olimex STM32-P103 board
 * **peeklcd** - show last 60 CAN bus messages on LCD display (using uGFX)
 * **pwmstep** - a first test to drive the stepper motor from PWM
