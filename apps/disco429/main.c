@@ -17,11 +17,11 @@
 #include "ch.h"
 #include "hal.h"
 #include "test.h"
-
 #include "chprintf.h"
 #include "shell.h"
 
-#include "usbcfg.h"
+#define USBD1 USBD2
+#include "../../common/usbconf.h"
 
 /*
  * Red LED blinker thread, times are in milliseconds.
@@ -60,9 +60,6 @@ static msg_t Thread2(void *arg) {
 /*===========================================================================*/
 /* Command line related.                                                     */
 /*===========================================================================*/
-
-/* Virtual serial port over USB.*/
-SerialUSBDriver SDU1;
 
 #define SHELL_WA_SIZE   THD_WA_SIZE(2048)
 #define TEST_WA_SIZE    THD_WA_SIZE(256)
