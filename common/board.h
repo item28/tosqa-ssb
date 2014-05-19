@@ -18,6 +18,8 @@
 #ifndef _BOARD_H_
 #define _BOARD_H_
 
+// #define SSB_REV11  // define this for older SSB 1.1 board
+
 /*
  * Setup for Tosqa Single Stepper Board.
  */
@@ -122,6 +124,14 @@
 /*
  * Pin definitions.
  */
+                                                                                                        
+#ifdef SSB_REV11
+#define GPIO1_MOTOR_DIR         4
+#define GPIO1_DIGIPOT_UD        11
+#else
+#define GPIO1_MOTOR_DIR         11
+#define GPIO1_DIGIPOT_UD        4
+#endif
 
 #define GPIO3_MOTOR_SLEEP       2
 #define GPIO1_MOTOR_MS3         6
@@ -129,7 +139,7 @@
 #define GPIO3_MOTOR_MS1         3
 #define GPIO1_MOTOR_RESET       5
 #define GPIO3_MOTOR_EN          0
-#define GPIO1_MOTOR_DIR         4
+// #define GPIO1_MOTOR_DIR      11
 #define GPIO0_MOTOR_STEP        11
 
 #define GPIO0_HALL_DEC          6
@@ -158,7 +168,7 @@
 #define GPIO1_LEVEL_VMOT        1
 
 #define GPIO3_DIGIPOT_CS        1
-#define GPIO1_DIGIPOT_UD        11
+// #define GPIO1_DIGIPOT_UD     4
                                                                                                         
 #define GPIO1_POWER_TERM        10
 #define GPIO2_POWER_RJ12        11
