@@ -9,6 +9,7 @@ Brief description of the applications in this area:
 * **digipot** - move the digital vref adjust through its entire range
 * **disco051** - test application for the STM32F051 Discovery board
 * **disco303** - test application for the STM32F303 Discovery board
+* **disco407** - CAN to serial USB bridge using the STM32F407 Discovery board
 * **disco429** - test application for the STM32F429 Discovery board
 * **driver** - complete CAN and stepper driver for the SSB
 * **fakeboot** - test re-flashing code and the secondary boot mechanism
