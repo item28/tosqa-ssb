@@ -491,7 +491,7 @@ static uint32_t parseHexNum (void) {
     char c = canCmdBuf[canCmdFill];
     if (c > ' ') {
       if (('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'))
-        c += 7;
+        c -= 7;
       else if (c < '0' || c > '9')
         return v;
       v = (v << 4) | (c & 0x0F);
@@ -503,8 +503,8 @@ static uint32_t parseHexNum (void) {
 static uint8_t parseHexByte (void) {
   char c1 = canCmdBuf[canCmdFill++];
   char c2 = canCmdBuf[canCmdFill++];
-  if (c1 > '9') c1 += 7;
-  if (c2 > '9') c2 += 7;
+  if (c1 > '9') c1 -= 7;
+  if (c2 > '9') c2 -= 7;
   return ((c1 & 0x0F) << 4) | (c2 & 0x0F);
 }
 
